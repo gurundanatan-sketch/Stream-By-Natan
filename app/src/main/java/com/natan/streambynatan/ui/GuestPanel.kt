@@ -55,10 +55,16 @@ fun GuestPanel(activity: MainActivity) {
     if (showLink) GlassCard {
         val link = gm.link(s.guest, "guest")
         Text(link, color = Neon.Cyan)
+        Text("Kode ruang: ${gm.roomId}", color = Neon.Muted)
         val bmp = remember(link) { QrItem.makeQr(link, 480, 0xFF000000.toInt(), 0xFFFFFFFF.toInt()) }
         Image(bmp.asImageBitmap(), "Kode QR undangan tamu", Modifier.height(220.dp))
         GhostButton("Bagikan link undangan", icon = Icons.Filled.Share) {
-            activity.startActivity(Intent.createChooser(Intent(Intent.ACTION_SEND).setType("text/plain").putExtra(Intent.EXTRA_TEXT, "Gabung live saya: $link"), "Bagikan"))
+            val text = "Gabung live saya sebagai tamu: $link\n\nLink ini membuka aplikasi Stream By Natan (gratis). Kalau belum punya, ada tombol Unduh aplikasi atau Masuk lewat browser."
+            activity.startActivity(Intent.createChooser(Intent(Intent.ACTION_SEND).setType("text/plain").putExtra(Intent.EXTRA_TEXT, text), "Bagikan"))
+        }
+        GhostButton("Bagikan link download aplikasi", icon = Icons.Filled.Share) {
+            val dl = com.natan.streambynatan.BuildConfig.HOSTING_URL + "/"
+            activity.startActivity(Intent.createChooser(Intent(Intent.ACTION_SEND).setType("text/plain").putExtra(Intent.EXTRA_TEXT, "Unduh aplikasi Stream By Natan (gratis): $dl"), "Bagikan"))
         }
     }
 

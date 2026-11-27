@@ -59,10 +59,37 @@
             <intent-filter>
                 <action android:name="android.hardware.usb.action.USB_DEVICE_ATTACHED" />
             </intent-filter>
+            <!-- Link undangan tamu: langsung membuka aplikasi kalau sudah terpasang -->
+            <intent-filter android:autoVerify="true">
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="https" />
+                <data android:host="${hostingHost}" />
+                <data android:host="${hostingHost2}" />
+                <data android:pathPrefix="/join" />
+            </intent-filter>
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="streambynatan" android:host="join" />
+            </intent-filter>
             <meta-data
                 android:name="android.hardware.usb.action.USB_DEVICE_ATTACHED"
                 android:resource="@xml/usb_device_filter" />
         </activity>
+
+        <activity
+            android:name=".chat.TikTokWebActivity"
+            android:exported="false"
+            android:label="Halaman TikTok"
+            android:theme="@style/Theme.StreamByNatan" />
+
+        <service
+            android:name=".guest.GuestService"
+            android:exported="false"
+            android:foregroundServiceType="camera|microphone|mediaProjection" />
 
         <service
             android:name=".live.LiveService"

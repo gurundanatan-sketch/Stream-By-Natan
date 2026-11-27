@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Unduh · Stream By Natan</title>
+<link rel="stylesheet" href="/style.css">
+</head>
+<body>
+<main>
+  <p class="eyebrow">STREAM BY NATAN</p>
+  <h1>Unduh aplikasi</h1>
+  <p>Live ke YouTube & TikTok sekaligus, dan gabung jadi tamu live. Gratis.</p>
+  <section class="card">
+    <a id="apk" class="btn primary" href="https://github.com/gurundanatan-sketch/Stream-By-Natan/releases/latest/download/StreamByNatan.apk">Unduh APK terbaru</a>
+    <a id="back" class="btn" href="#" hidden>Sudah terpasang? Buka undangan lagi</a>
+    <a id="browser" class="btn ghost" href="#" hidden>Masuk lewat browser saja</a>
+  </section>
+  <section class="card small">
+    <h2>Cara pasang</h2>
+    <ol>
+      <li>Tekan <b>Unduh APK terbaru</b>. Tunggu sampai selesai.</li>
+      <li>Buka file <b>StreamByNatan.apk</b> dari notifikasi atau folder Download.</li>
+      <li>Kalau diminta, izinkan <b>Pasang aplikasi tidak dikenal</b> untuk browser ini, lalu tekan <b>Pasang</b>.</li>
+      <li>Kalau kamu diundang jadi tamu, kembali ke halaman ini dan tekan <b>Sudah terpasang? Buka undangan lagi</b>.</li>
+    </ol>
+    <p>Pembaruan berikutnya bisa langsung dipasang menimpa versi lama, tanpa hapus aplikasi.</p>
+  </section>
+</main>
+<script>
+(function () {
+  var p = new URLSearchParams(location.search);
+  var room = (p.get('room') || '').replace(/[^A-Za-z0-9_-]/g, '');
+  if (!room) return;
+  var q = 'room=' + encodeURIComponent(room) + '&mode=' + (p.get('mode') === 'camera' ? 'camera' : 'guest');
+  var back = document.getElementById('back');
+  back.href = 'intent://join?' + q + '#Intent;scheme=streambynatan;package=com.natan.streambynatan;end';
+  back.hidden = false;
+  var b = document.getElementById('browser');
+  b.href = '/guest/?' + q; b.hidden = false;
+})();
+</script>
+</body>
+</html>

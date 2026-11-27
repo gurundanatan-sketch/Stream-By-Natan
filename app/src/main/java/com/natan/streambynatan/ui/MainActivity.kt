@@ -22,6 +22,7 @@ import com.natan.streambynatan.chat.YouTubeAuth
 import com.natan.streambynatan.core.Graph
 import com.natan.streambynatan.data.SecureStore
 import com.natan.streambynatan.features.Updater
+import com.natan.streambynatan.guest.GuestService
 import com.natan.streambynatan.live.LiveBus
 import com.natan.streambynatan.live.LiveMode
 import com.natan.streambynatan.live.LiveService
@@ -35,6 +36,8 @@ class MainActivity : ComponentActivity() {
     val updateAvailable = mutableStateOf<Updater.Release?>(null)
     val youtubeConnected = mutableStateOf(false)
     val message = mutableStateOf<String?>(null)
+    /** Undangan tamu yang sedang dibuka (dari link atau kode). */
+    val guestInvite = mutableStateOf<GuestInvite?>(null)
 
     private var pendingMode = LiveMode.CAMERA
     private var pendingPractice = false
@@ -49,6 +52,19 @@ class MainActivity : ComponentActivity() {
         else if (pendingMode == LiveMode.SCREEN) message.value = "Izin rekam layar ditolak."
         else LiveService.start(this, pendingMode, pendingPractice, Activity.RESULT_CANCELED, null)
         afterStart()
+    }
+
+    private val guestProjection = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { r ->
+        val data = r.data
+        if (r.resultCode == Activity.RESULT_OK && data != null) {
+            GuestService.start(this, screen = true) { Graph.guestClient.startScreen(data) }
+        } else message.value = "Berbagi layar dibatalkan."
+    }
+
+    /** Tamu: minta izin rekam layar untuk berbagi layar ke host. */
+    fun requestGuestScreenShare() {
+        val mpm = getSystemService(MediaProjectionManager::class.java)
+        guestProjection.launch(mpm.createScreenCaptureIntent())
     }
 
     private val ytAuthLauncher = registerForActivityResult(ActivityResultContracts.StartIntentSenderForResult()) { r ->
@@ -70,13 +86,24 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         if (Graph.settings.current.features.keepScreenOn) window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
-        askBasicPermissions()
+        handleInvite(intent)
+        if (guestInvite.value == null) askBasicPermissions()
         setContent { StreamTheme { AppRoot(this) } }
         lifecycleScope.launch {
             youtubeConnected.value = YouTubeAuth.silentToken(this@MainActivity) != null
             if (Graph.settings.current.updateCheckOnStart) updateAvailable.value = Updater.check()
         }
         lifecycleScope.launch { LiveBus.announce.collect { window.decorView.announceForAccessibility(it) } }
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        handleInvite(intent)
+    }
+
+    private fun handleInvite(i: Intent?) {
+        val uri = i?.data ?: return
+        parseInvite(uri.toString())?.let { guestInvite.value = it }
     }
 
     fun basicPermissionsGranted(): Boolean =
@@ -166,4 +193,21 @@ class MainActivity : ComponentActivity() {
             if (f != null) Updater.install(this@MainActivity, f) else message.value = "Unduhan gagal."
         }
     }
+
+    companion object {
+        /** Membaca link undangan (https://…/join/?room=…, streambynatan://join?room=…, …/guest/?room=…) atau kode ruang saja. */
+        fun parseInvite(text: String): GuestInvite? {
+            val t = text.trim()
+            if (t.isBlank()) return null
+            if (t.contains("://")) {
+                val u = runCatching { Uri.parse(t) }.getOrNull() ?: return null
+                val room = u.getQueryParameter("room")?.trim().orEmpty()
+                if (room.isBlank()) return null
+                return GuestInvite(room, if (u.getQueryParameter("mode") == "camera") "camera" else "guest")
+            }
+            return if (Regex("^[A-Za-z0-9_-]{4,40}$").matches(t)) GuestInvite(t, "guest") else null
+        }
+    }
 }
+
+data class GuestInvite(val room: String, val mode: String)

@@ -1,0 +1,12 @@
+[
+  {
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "com.natan.streambynatan",
+      "sha256_cert_fingerprints": [
+        "6B:55:BD:4D:BC:6B:3F:27:46:4C:3B:85:8D:FB:18:D9:58:D9:74:86:21:3F:FB:56:DF:9D:06:F8:5C:28:52:A2"
+      ]
+    }
+  }
+]

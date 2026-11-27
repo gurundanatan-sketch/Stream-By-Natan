@@ -33,7 +33,7 @@ import java.util.UUID
 private data class Page(val id: String, val title: String, val subtitle: String, val icon: androidx.compose.ui.graphics.vector.ImageVector)
 
 private val pages = listOf(
-    Page("keys", "Stream key & server", "YouTube, TikTok, komentar (Euler Stream, YouTube API)", Icons.Filled.Key),
+    Page("keys", "Stream key & server", "YouTube, TikTok, komentar (tanpa API key TikTok)", Icons.Filled.Key),
     Page("video", "Video & koneksi", "Resolusi, bitrate adaptif, sambung ulang, rekam", Icons.Filled.HighQuality),
     Page("features", "Semua fitur", "Nyalakan atau matikan setiap fitur", Icons.Filled.ToggleOn),
     Page("profiles", "Profil live", "Ngobrol santai, Presentasi, Khotbah, dll", Icons.Filled.Badge),
@@ -100,7 +100,6 @@ private typealias Up = ((AppSettings) -> AppSettings) -> Unit
 private fun KeysPage(activity: MainActivity, s: AppSettings, up: Up) {
     var ytKey by remember { mutableStateOf(Graph.secure.get(SecureStore.YOUTUBE_KEY)) }
     var ttKey by remember { mutableStateOf(Graph.secure.get(SecureStore.TIKTOK_KEY)) }
-    var euler by remember { mutableStateOf(Graph.secure.get(SecureStore.EULER_API_KEY)) }
     var ytApi by remember { mutableStateOf(Graph.secure.get(SecureStore.YOUTUBE_API_KEY)) }
     var ytServer by remember { mutableStateOf(s.youtubeServer) }
     var ttServer by remember { mutableStateOf(s.tiktokServer) }
@@ -128,7 +127,11 @@ private fun KeysPage(activity: MainActivity, s: AppSettings, up: Up) {
     GlassCard {
         SectionTitle("Komentar & kejadian")
         Field("Username TikTok (tanpa @)", s.tiktokUsername) { v -> up { it.copy(tiktokUsername = v.trim()) } }
-        Field("API key Euler Stream", euler, secret = true) { euler = it; Graph.secure.put(SecureStore.EULER_API_KEY, it.trim()) }
+        Text("Komentar, hadiah, ikuti, bagikan & penonton TikTok dibaca langsung dari halaman live TikTok kamu. Tidak perlu API key.", color = Neon.Muted)
+        GhostButton("Buka halaman TikTok (login / verifikasi)", icon = Icons.Filled.OpenInBrowser) {
+            activity.startActivity(android.content.Intent(activity, com.natan.streambynatan.chat.TikTokWebActivity::class.java))
+        }
+        GhostButton("Sambung ulang komentar TikTok", icon = Icons.Filled.Refresh) { Graph.tiktok.reload() }
         Field("ID video YouTube live (opsional)", s.youtubeVideoId) { v -> up { it.copy(youtubeVideoId = v.trim()) } }
         Field("API key YouTube Data (opsional kalau sudah login Google)", ytApi, secret = true) { ytApi = it; Graph.secure.put(SecureStore.YOUTUBE_API_KEY, it.trim()) }
         Field("Link kanal YouTube (untuk bagikan link)", s.youtubeChannelUrl) { v -> up { it.copy(youtubeChannelUrl = v.trim()) } }

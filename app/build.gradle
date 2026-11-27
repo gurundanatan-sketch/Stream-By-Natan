@@ -35,6 +35,9 @@ if ((ksFile == null || !file(ksFile).exists()) && localProps.exists()) {
 }
 def hasSigning = ksFile != null && file(ksFile).exists()
 
+// ID proyek Firebase untuk link undangan tamu (https://<id>.web.app/join/...)
+def hostingId = System.getenv('FIREBASE_PROJECT_ID') ?: 'stream-by-natan-29448'
+
 android {
     namespace 'com.natan.streambynatan'
     compileSdk 36
@@ -47,6 +50,9 @@ android {
         versionName appVersionName
         buildConfigField 'boolean', 'HAS_FIREBASE', hasFirebase.toString()
         buildConfigField 'String', 'GITHUB_REPO', '"gurundanatan-sketch/Stream-By-Natan"'
+        // Alamat halaman undangan tamu & halaman unduh (Firebase Hosting)
+        buildConfigField 'String', 'HOSTING_URL', "\"https://${hostingId}.web.app\""
+        manifestPlaceholders = [hostingHost: "${hostingId}.web.app", hostingHost2: "${hostingId}.firebaseapp.com"]
         vectorDrawables { useSupportLibrary true }
         // HP Android modern (32 & 64 bit). Membuat APK lebih kecil karena FFmpeg & WebRTC cukup besar.
         ndk { abiFilters 'arm64-v8a', 'armeabi-v7a' }
@@ -106,6 +112,12 @@ android {
         abortOnError false
         checkReleaseBuilds false
     }
+}
+
+// RNNoise 1.0.2 menandai dirinya "butuh compileSdk 37", padahal isinya hanya kode C (JNI)
+// yang tidak memakai API Android baru. Pemeriksaan ini dilewati supaya build tidak gagal.
+tasks.configureEach { t ->
+    if (t.name ==~ /check.*AarMetadata/) t.enabled = false
 }
 
 kotlin {

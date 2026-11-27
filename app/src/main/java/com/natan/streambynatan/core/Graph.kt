@@ -33,10 +33,11 @@ object Graph {
     val sounds by lazy { SoundBoard(app, mixer) }
     val speech by lazy { SpeechHub(app) }
     val translator by lazy { CommentTranslator() }
-    val tiktok by lazy { TikTokClient(http) }
+    val tiktok by lazy { TikTokClient(app, http) }
     val ytApi by lazy { YouTubeApi(app, http) }
     val ytChat by lazy { YouTubeChatClient(ytApi) }
     val guests by lazy { GuestManager(app) }
+    val guestClient by lazy { com.natan.streambynatan.guest.GuestClient(app) }
     val recordings by lazy { RecordingManager(app, local) }
     val firebase by lazy { FirebaseSync(app) }
 

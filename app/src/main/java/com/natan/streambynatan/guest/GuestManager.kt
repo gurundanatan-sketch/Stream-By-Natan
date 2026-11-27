@@ -81,8 +81,9 @@ class GuestManager(private val context: Context) {
     private fun peersCol() = db?.collection("rooms")?.document(roomId)?.collection("peers")
 
     fun link(cfg: GuestConfig, mode: String): String {
-        val base = cfg.webBaseUrl.trimEnd('/').ifBlank { "https://PROYEK-FIREBASE.web.app" }
-        return "$base/guest/?room=$roomId&mode=$mode"
+        val base = cfg.webBaseUrl.trimEnd('/').ifBlank { com.natan.streambynatan.BuildConfig.HOSTING_URL }
+        // Satu link pintar: membuka aplikasi kalau terpasang, kalau belum muncul halaman "Unduh aplikasi" / "Masuk lewat browser"
+        return "$base/join/?room=$roomId&mode=$mode"
     }
 
     fun start(config: GuestConfig): Boolean {

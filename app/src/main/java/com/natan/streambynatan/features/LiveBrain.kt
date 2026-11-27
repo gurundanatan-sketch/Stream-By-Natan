@@ -113,7 +113,7 @@ class LiveBrain(private val context: Context, private val engine: LiveEngine, pr
         scope.launch { LiveBus.events.collect { runCatching { handle(it) } } }
         // TikTok & YouTube
         if (!engine.practice) {
-            if (s.enableTikTok) g.tiktok.connect(s.tiktokUsername, g.secure.get(SecureStore.EULER_API_KEY))
+            if (s.enableTikTok) g.tiktok.connect(s.tiktokUsername)
             if (s.enableYouTube) g.ytChat.start(s.youtubeVideoId, g.secure.get(SecureStore.YOUTUBE_API_KEY))
         }
         // pengenal suara

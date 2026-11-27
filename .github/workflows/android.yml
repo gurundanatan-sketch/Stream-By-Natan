@@ -94,6 +94,8 @@ jobs:
         run: |
           mkdir -p out
           cp app/build/outputs/apk/release/*.apk "out/StreamByNatan-v1.0.${GITHUB_RUN_NUMBER}.apk"
+          # nama tetap untuk tombol "Unduh aplikasi" di halaman undangan (releases/latest/download/StreamByNatan.apk)
+          cp app/build/outputs/apk/release/*.apk "out/StreamByNatan.apk"
           ls -la out
 
       - name: Simpan APK sebagai artifact

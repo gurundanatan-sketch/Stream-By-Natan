@@ -47,6 +47,12 @@ fun AppRoot(activity: MainActivity) {
     val msg by activity.message
     LaunchedEffect(msg) { msg?.let { snack.showSnackbar(it); activity.message.value = null } }
 
+    // Tamu dari link undangan: langsung ke layar tamu (gratis, tanpa akun)
+    activity.guestInvite.value?.let { inv ->
+        AuroraBackground { Box(Modifier.statusBarsPadding()) { GuestJoinScreen(activity, inv) { activity.guestInvite.value = null } } }
+        return
+    }
+
     // 1) izin dulu, 2) login email/Google, 3) baru tampilan utama
     if (!permsDone) { AuroraBackground { androidx.compose.foundation.layout.Box(Modifier.statusBarsPadding()) { PermissionScreen(activity) { permsDone = true } } }; return }
     if (!loggedIn) { AuroraBackground { androidx.compose.foundation.layout.Box(Modifier.statusBarsPadding()) { LoginScreen(activity) { loggedIn = true } } }; return }

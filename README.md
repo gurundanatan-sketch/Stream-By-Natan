@@ -65,7 +65,12 @@ APK ada di tab **Actions** (artifact `StreamByNatan-apk`) dan di halaman **Relea
 3. Unduh `google-services.json`, lalu salin isinya ke secret `GOOGLE_SERVICES_JSON`.
 4. **Authentication**: aktifkan **Email/Password** dan **Google**.
 5. **Firestore**: buat database, lalu tempel isi `firestore.rules` ke tab Rules.
-6. **Hosting**: untuk halaman tamu (folder `web/`).
+6. **Hosting**: halaman undangan, halaman unduh, dan halaman tamu browser (folder `web/`). Terbitkan dari Termux:
+   ```
+   python scripts/write_web_config.py stream-by-natan-29448
+   firebase deploy --only hosting --project stream-by-natan-29448
+   ```
+   File `web/.well-known/assetlinks.json` membuat link undangan langsung membuka aplikasi (berisi sidik jari SHA-256 kunci pribadi).
 7. Cloud Messaging dan Crashlytics otomatis aktif.
 
 ## 5. Pengaturan YouTube (Google Cloud Console)
@@ -97,7 +102,7 @@ python scripts/download_assets.py
 - Pemeriksaan sebelum live (internet, stream key, mikrofon, audio internal)
 - Mode latihan, profil live, cadangan pengaturan ke Firebase
 
-**Komentar & penonton** (TikTok lewat Euler Stream, YouTube lewat YouTube Data API)
+**Komentar & penonton** (TikTok dibaca langsung dari halaman live TikTok tanpa API key, YouTube lewat YouTube Data API)
 - TTS bahasa Indonesia (Google TTS) dengan suara/kecepatan/volume sendiri
 - Terima kasih otomatis untuk gift (jumlah koin), follow, subscribe, share, Super Chat, member, Saweria; template {nama} {hadiah} {jumlah} {koin}
 - Filter kata kasar, mute penonton, terjemahan komentar offline (ML Kit)
@@ -123,11 +128,13 @@ python scripts/download_assets.py
 **Tamu live**
 - Banyak orang bisa masuk **ruang tunggu**, antre berdasarkan siapa yang datang lebih dulu
 - Host memasukkan satu orang, beberapa yang dipilih, atau semua
-- Tamu bisa **berbagi layar** (dari browser yang mendukung, misalnya Chrome di laptop)
+- Tamu masuk **lewat aplikasi ini sendiri (gratis, tanpa akun)** dengan kamera, mikrofon, dan **berbagi layar HP**
+- Tamu juga bisa masuk lewat browser (berbagi layar dari browser butuh laptop/komputer)
 - Host bisa **membisukan mikrofon tamu**; tamu bisa menyalakannya lagi sendiri
 - Host bisa **mengeluarkan tamu**
 - Tata letak otomatis: tidak ada yang bicara atau beberapa orang bicara bersamaan, ukuran layar **sama**; hanya satu orang bicara, layarnya otomatis **penuh layar**
-- Tamu masuk lewat link atau kode QR, tanpa memasang aplikasi
+- **Satu link undangan pintar** (`https://<proyek>.web.app/join/?room=…`): membuka aplikasi kalau sudah terpasang; kalau belum, muncul halaman dengan tombol **Unduh aplikasi** (APK terbaru dari GitHub Releases) dan **Masuk lewat browser**
+- Kode QR undangan, kode ruang yang bisa ditempel di layar masuk, dan tombol **Bagikan link download aplikasi**
 
 **Setelah live**
 - Ringkasan live, perkembangan antar-live (hari & jam terbaik)
@@ -156,8 +163,11 @@ papan nama di layar, simpan ke Google Drive.
 - **Kenney (CC0)** + **Wikimedia Commons**: 200 efek suara; **Incompetech**: 20 musik latar.
 
 ## Catatan
-- Kode ini belum pernah dikompilasi di lingkungan pembuatnya (tanpa Android SDK), jadi build pertama di GitHub Actions mungkin masih menunjukkan beberapa error kecil. Kirim pesan error-nya, nanti diperbaiki.
+- Kode ini belum pernah dikompilasi di lingkungan pembuatnya (tanpa Android SDK), jadi build di GitHub Actions mungkin masih menunjukkan beberapa error kecil. Kirim pesan error-nya, nanti diperbaiki.
+- RNNoise 1.0.2 menandai dirinya butuh compileSdk 37; pemeriksaan itu dilewati di `app/build.gradle` karena library-nya hanya kode C (JNI).
 - FFmpeg dan WebRTC menambah ukuran APK. APK dibuat untuk HP ARM 32 & 64 bit supaya tidak terlalu besar.
-- Komentar TikTok butuh API key Euler Stream. Paket gratisnya terbatas per hari.
-- Berbagi layar dari browser HP Android belum didukung Chrome Android. Tamu sebaiknya berbagi layar dari laptop atau komputer.
+- Komentar TikTok dibaca dari halaman live TikTok di browser tersembunyi (skrip `app/src/main/assets/tiktok_reader.js`). Aplikasi mengambil versi terbaru skrip ini dari GitHub setiap live, jadi kalau TikTok mengubah tampilan halamannya, cukup perbarui file itu. Kalau TikTok minta login atau verifikasi, buka **Pengaturan > Stream key & server > Buka halaman TikTok**. Nilai koin hadiah adalah perkiraan untuk hadiah populer.
+- Supaya pembaca TikTok tetap jalan saat live, izinkan **Tampil di atas aplikasi lain**.
+- Berbagi layar dari browser HP Android belum didukung Chrome Android. Tamu di HP sebaiknya masuk lewat aplikasi.
+- **Paket**: sekarang semua fitur gratis (masa promosi). Struktur premium sudah disiapkan di `core/Plans.kt` untuk setelah rilis Play Store. Peran tamu selalu gratis.
 - Suara tamu dan notifikasi Saweria ikut tersiar kalau **audio internal** dinyalakan (butuh izin rekam layar).

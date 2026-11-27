@@ -9,6 +9,8 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.height
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AccountCircle
+import androidx.compose.material.icons.filled.ContentPaste
+import androidx.compose.material.icons.filled.GroupAdd
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Security
 import androidx.compose.material.icons.filled.Download
@@ -56,6 +58,7 @@ fun LoginScreen(activity: MainActivity, onDone: () -> Unit) {
         Spacer(Modifier.height(30.dp))
         Text("STREAM BY NATAN", style = MaterialTheme.typography.labelMedium, color = Neon.Cyan)
         ScreenTitle("Masuk", "Masuk dengan email atau akun Google untuk mulai memakai aplikasi.")
+        JoinAsGuestCard(activity)
         if (!Graph.firebase.available) {
             GlassCard {
                 Text("Firebase belum diatur di versi ini (google-services.json belum ada), jadi login belum bisa dipakai.", color = Neon.Amber)
@@ -236,4 +239,23 @@ private fun summaryText(s: LiveSummary): String {
         "${s.comments} komentar · ${s.questions} pertanyaan · ${s.follows} follow · ${s.subscribes} subscribe · ${s.shares} share · " +
         "${s.newViewers} penonton baru" + (if (s.donations > 0) " · donasi Rp${s.donations}" else "") +
         (if (s.topSupporters.isNotEmpty()) "\nPendukung: " + s.topSupporters.joinToString(", ") else "")
+}
+
+
+/** Untuk tamu yang diundang: tempel link atau kode undangan. Gratis, tanpa akun. */
+@Composable
+fun JoinAsGuestCard(activity: MainActivity) {
+    var code by remember { mutableStateOf("") }
+    var err by remember { mutableStateOf<String?>(null) }
+    GlassCard {
+        SectionTitle("Diundang jadi tamu live?")
+        Text("Tempel link atau kode undangan dari host. Gratis, tidak perlu akun.", color = Neon.Muted)
+        Field("Link atau kode undangan", code) { code = it; err = null }
+        err?.let { Text(it, color = Neon.Red, modifier = Modifier.semantics { liveRegion = LiveRegionMode.Assertive }) }
+        GhostButton("Tempel dari clipboard", icon = Icons.Filled.ContentPaste) { activity.clipboardText()?.let { code = it } }
+        NeonButton("Gabung sebagai tamu", icon = Icons.Filled.GroupAdd, enabled = code.isNotBlank()) {
+            val inv = MainActivity.parseInvite(code)
+            if (inv == null) err = "Link atau kode undangan tidak dikenali." else activity.guestInvite.value = inv
+        }
+    }
 }

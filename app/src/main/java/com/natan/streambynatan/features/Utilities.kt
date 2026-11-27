@@ -107,7 +107,7 @@ object PreLiveCheck {
         // audio internal
         lines += if (Build.VERSION.SDK_INT >= 29) "Audio internal didukung, izinkan rekam layar saat mulai" else "Audio internal butuh Android 10 ke atas"
         // komentar
-        if (s.enableTikTok && (s.tiktokUsername.isBlank() || g.secure.get(SecureStore.EULER_API_KEY).isBlank())) lines += "Komentar TikTok belum diatur"
+        if (s.enableTikTok && s.tiktokUsername.isBlank()) lines += "Username TikTok belum diisi (untuk membaca komentar)"
         Result(ok, lines)
     }
 
