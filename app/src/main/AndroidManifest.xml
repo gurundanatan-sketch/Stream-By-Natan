@@ -81,6 +81,13 @@
         </activity>
 
         <activity
+            android:name=".core.CrashActivity"
+            android:exported="false"
+            android:process=":crash"
+            android:label="Laporan error"
+            android:theme="@android:style/Theme.Material.NoActionBar" />
+
+        <activity
             android:name=".chat.TikTokWebActivity"
             android:exported="false"
             android:label="Halaman TikTok"

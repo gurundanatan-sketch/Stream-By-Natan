@@ -85,8 +85,9 @@ fun AuroraBackground(modifier: Modifier = Modifier, content: @Composable BoxScop
     Box(modifier.fillMaxSize().background(Neon.Void)) {
         Canvas(Modifier.fillMaxSize()) {
             val w = size.width; val h = size.height
+            if (w < 2f || h < 2f) return@Canvas   // ukuran belum siap: jangan gambar (gradien radius 0 bikin error)
             fun blob(c: Color, cx: Float, cy: Float, r: Float) =
-                drawCircle(Brush.radialGradient(listOf(c.copy(alpha = 0.32f), Color.Transparent), Offset(cx, cy), r), r, Offset(cx, cy))
+                drawCircle(Brush.radialGradient(listOf(c.copy(alpha = 0.32f), Color.Transparent), Offset(cx, cy), r.coerceAtLeast(1f)), r.coerceAtLeast(1f), Offset(cx, cy))
             blob(Neon.Violet, w * (0.2f + 0.12f * cos(t)), h * (0.18f + 0.05f * sin(t)), w * 0.8f)
             blob(Neon.Cyan, w * (0.85f + 0.1f * sin(t * 1.3f)), h * (0.42f + 0.06f * cos(t)), w * 0.7f)
             blob(Neon.Pink, w * (0.35f + 0.15f * sin(t * 0.7f)), h * (0.92f + 0.04f * cos(t * 1.1f)), w * 0.75f)

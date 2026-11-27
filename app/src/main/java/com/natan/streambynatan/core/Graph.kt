@@ -57,6 +57,10 @@ object Graph {
 class App : Application() {
     override fun onCreate() {
         super.onCreate()
+        // Penangkap error dipasang paling awal. Proses ":crash" hanya untuk layar laporan error.
+        CrashReporter.install(this)
+        val proc = if (android.os.Build.VERSION.SDK_INT >= 28) android.app.Application.getProcessName() else ""
+        if (proc.endsWith(":crash")) return
         Graph.init(this)
         Graph.firebase.init()
     }
