@@ -1,0 +1,121 @@
+package com.natan.streambynatan.ui
+
+import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Insights
+import androidx.compose.material.icons.filled.Sensors
+import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.VideoLibrary
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Icon
+import androidx.compose.material3.NavigationBar
+import androidx.compose.material3.NavigationBarItem
+import androidx.compose.material3.NavigationBarItemDefaults
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import com.natan.streambynatan.core.Graph
+import com.natan.streambynatan.data.SecureStore
+import com.natan.streambynatan.ui.theme.AuroraBackground
+import com.natan.streambynatan.ui.theme.Neon
+
+@Composable
+fun AppRoot(activity: MainActivity) {
+    var tab by rememberSaveable { mutableStateOf(0) }
+    var settingsPage by rememberSaveable { mutableStateOf<String?>(null) }
+    var permsDone by rememberSaveable { mutableStateOf(activity.basicPermissionsGranted()) }
+    var loggedIn by rememberSaveable { mutableStateOf(Graph.firebase.uid != null) }
+    val snack = remember { SnackbarHostState() }
+    val msg by activity.message
+    LaunchedEffect(msg) { msg?.let { snack.showSnackbar(it); activity.message.value = null } }
+
+    // 1) izin dulu, 2) login email/Google, 3) baru tampilan utama
+    if (!permsDone) { AuroraBackground { androidx.compose.foundation.layout.Box(Modifier.statusBarsPadding()) { PermissionScreen(activity) { permsDone = true } } }; return }
+    if (!loggedIn) { AuroraBackground { androidx.compose.foundation.layout.Box(Modifier.statusBarsPadding()) { LoginScreen(activity) { loggedIn = true } } }; return }
+
+    BackHandler(enabled = settingsPage != null) { settingsPage = null }
+
+    Scaffold(
+        containerColor = Neon.Void,
+        snackbarHost = { SnackbarHost(snack) },
+        bottomBar = {
+            NavigationBar(containerColor = Neon.Deep) {
+                listOf(
+                    Triple("Live", Icons.Filled.Sensors, 0),
+                    Triple("Rekaman", Icons.Filled.VideoLibrary, 1),
+                    Triple("Progres", Icons.Filled.Insights, 2),
+                    Triple("Pengaturan", Icons.Filled.Settings, 3),
+                ).forEach { (label, icon, i) ->
+                    NavigationBarItem(
+                        selected = tab == i, onClick = { tab = i; if (i != 3) settingsPage = null },
+                        icon = { Icon(icon, null) }, label = { Text(label) },
+                        colors = NavigationBarItemDefaults.colors(selectedIconColor = Neon.Void, indicatorColor = Neon.Cyan,
+                            selectedTextColor = Neon.Cyan, unselectedIconColor = Neon.Muted, unselectedTextColor = Neon.Muted),
+                    )
+                }
+            }
+        },
+    ) { pad ->
+        AuroraBackground(Modifier.padding(pad)) {
+            Box(Modifier.fillMaxSize().statusBarsPadding()) {
+                when (tab) {
+                    0 -> LiveScreen(activity)
+                    1 -> LibraryScreen()
+                    2 -> ProgressScreen()
+                    else -> if (settingsPage == null) SettingsHome { settingsPage = it } else SettingsPage(activity, settingsPage!!) { settingsPage = null }
+                }
+            }
+        }
+    }
+
+    // Deteksi key TikTok di clipboard: tanya Ya/Tidak
+    activity.clipboardKey.value?.let { key ->
+        AlertDialog(
+            onDismissRequest = { activity.clipboardKey.value = null },
+            title = { Text("Key TikTok terdeteksi") },
+            text = { Text("Ada teks di clipboard yang mirip stream key TikTok. Pakai sebagai key TikTok untuk live ini?") },
+            confirmButton = { TextButton(onClick = {
+                Graph.secure.put(SecureStore.TIKTOK_KEY, key); activity.clipboardKey.value = null
+                activity.message.value = "Key TikTok disimpan."
+            }) { Text("Ya") } },
+            dismissButton = { TextButton(onClick = { activity.clipboardKey.value = null }) { Text("Tidak") } },
+        )
+    }
+
+    activity.updateAvailable.value?.let { rel ->
+        AlertDialog(
+            onDismissRequest = { activity.updateAvailable.value = null },
+            title = { Text("Ada versi baru") },
+            text = { Text("${rel.name} sudah tersedia. Mau dipasang?") },
+            confirmButton = { TextButton(onClick = { activity.updateAvailable.value = null; activity.installUpdate(rel) }) { Text("Ya") } },
+            dismissButton = { TextButton(onClick = { activity.updateAvailable.value = null }) { Text("Nanti") } },
+        )
+    }
+}
+
+@Composable
+fun ScreenColumn(content: @Composable androidx.compose.foundation.layout.ColumnScope.() -> Unit) {
+    Column(
+        Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 18.dp, vertical = 12.dp),
+        verticalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(14.dp),
+        content = content,
+    )
+}

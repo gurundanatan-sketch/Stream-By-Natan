@@ -1,0 +1,45 @@
+name: Unduh aset suara (uji manual)
+
+# Jalankan manual dari tab Actions untuk melihat 200 efek suara & 20 musik yang berhasil diunduh.
+# Aset ini hanya masuk ke DALAM aplikasi (res/raw), tidak pernah muncul di galeri HP.
+on:
+  workflow_dispatch:
+    inputs:
+      max_sfx:
+        description: 'Jumlah efek suara'
+        default: '200'
+      max_music:
+        description: 'Jumlah musik latar'
+        default: '20'
+
+jobs:
+  assets:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Pasang ffmpeg
+        run: sudo apt-get update -y && sudo apt-get install -y ffmpeg
+      - name: Unduh & konversi
+        env:
+          MAX_SFX: ${{ github.event.inputs.max_sfx }}
+          MAX_MUSIC: ${{ github.event.inputs.max_music }}
+          PEXELS_API_KEY: ${{ secrets.PEXELS_API_KEY }}
+          PIXABAY_API_KEY: ${{ secrets.PIXABAY_API_KEY }}
+        run: python scripts/download_assets.py
+      - name: Cek
+        run: python scripts/check_project.py
+      - name: Ringkasan
+        run: |
+          echo "### Aset suara" >> $GITHUB_STEP_SUMMARY
+          echo "- File di res/raw: $(ls app/src/main/res/raw | wc -l)" >> $GITHUB_STEP_SUMMARY
+          echo "- Ukuran total: $(du -sh app/src/main/res/raw | cut -f1)" >> $GITHUB_STEP_SUMMARY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: aset-suara
+          path: |
+            app/src/main/res/raw
+            app/src/main/assets/*.json
+            app/src/main/assets/credits.txt

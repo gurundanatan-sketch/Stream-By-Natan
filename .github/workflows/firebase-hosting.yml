@@ -1,0 +1,37 @@
+name: Terbitkan halaman tamu ke Firebase Hosting
+
+on:
+  push:
+    branches: [ "main", "master" ]
+    paths: [ "web/**", "firebase.json", ".github/workflows/firebase-hosting.yml" ]
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Cek secret Firebase
+        id: cek
+        env:
+          SA: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+          PID: ${{ secrets.FIREBASE_PROJECT_ID }}
+        run: |
+          if [ -n "$SA" ] && [ -n "$PID" ]; then echo "siap=ya" >> "$GITHUB_OUTPUT"; else echo "Secret FIREBASE_SERVICE_ACCOUNT / FIREBASE_PROJECT_ID belum diisi, dilewati."; fi
+
+      - name: Tulis konfigurasi web Firebase
+        if: steps.cek.outputs.siap == 'ya'
+        env:
+          WEB_CONFIG: ${{ secrets.FIREBASE_WEB_CONFIG }}
+        run: |
+          if [ -n "$WEB_CONFIG" ]; then echo "window.FIREBASE_CONFIG = $WEB_CONFIG;" > web/guest/config.js; fi
+
+      - name: Terbitkan
+        if: steps.cek.outputs.siap == 'ya'
+        uses: FirebaseExtended/action-hosting-deploy@v0
+        with:
+          repoToken: ${{ secrets.GITHUB_TOKEN }}
+          firebaseServiceAccount: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+          projectId: ${{ secrets.FIREBASE_PROJECT_ID }}
+          channelId: live

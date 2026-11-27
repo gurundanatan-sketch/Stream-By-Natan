@@ -1,0 +1,122 @@
+[
+ {
+  "id": "sfx_ting",
+  "label": "Ting",
+  "source": "Disintesis oleh skrip (domain publik)",
+  "license": "CC0"
+ },
+ {
+  "id": "sfx_ding_dong",
+  "label": "Ding dong",
+  "source": "Disintesis oleh skrip (domain publik)",
+  "license": "CC0"
+ },
+ {
+  "id": "sfx_chime",
+  "label": "Lonceng kecil",
+  "source": "Disintesis oleh skrip (domain publik)",
+  "license": "CC0"
+ },
+ {
+  "id": "sfx_coin",
+  "label": "Koin",
+  "source": "Disintesis oleh skrip (domain publik)",
+  "license": "CC0"
+ },
+ {
+  "id": "sfx_pop",
+  "label": "Pop",
+  "source": "Disintesis oleh skrip (domain publik)",
+  "license": "CC0"
+ },
+ {
+  "id": "sfx_whoosh",
+  "label": "Whoosh",
+  "source": "Disintesis oleh skrip (domain publik)",
+  "license": "CC0"
+ },
+ {
+  "id": "sfx_applause_synth",
+  "label": "Tepuk tangan",
+  "source": "Disintesis oleh skrip (domain publik)",
+  "license": "CC0"
+ },
+ {
+  "id": "sfx_success",
+  "label": "Berhasil",
+  "source": "Disintesis oleh skrip (domain publik)",
+  "license": "CC0"
+ },
+ {
+  "id": "sfx_fail",
+  "label": "Gagal",
+  "source": "Disintesis oleh skrip (domain publik)",
+  "license": "CC0"
+ },
+ {
+  "id": "sfx_level_up",
+  "label": "Naik level",
+  "source": "Disintesis oleh skrip (domain publik)",
+  "license": "CC0"
+ },
+ {
+  "id": "sfx_heart",
+  "label": "Hati",
+  "source": "Disintesis oleh skrip (domain publik)",
+  "license": "CC0"
+ },
+ {
+  "id": "sfx_notif",
+  "label": "Notifikasi",
+  "source": "Disintesis oleh skrip (domain publik)",
+  "license": "CC0"
+ },
+ {
+  "id": "sfx_drumroll",
+  "label": "Drum roll",
+  "source": "Disintesis oleh skrip (domain publik)",
+  "license": "CC0"
+ },
+ {
+  "id": "sfx_magic",
+  "label": "Sihir",
+  "source": "Disintesis oleh skrip (domain publik)",
+  "license": "CC0"
+ },
+ {
+  "id": "sfx_bell_church",
+  "label": "Lonceng gereja",
+  "source": "Disintesis oleh skrip (domain publik)",
+  "license": "CC0"
+ },
+ {
+  "id": "sfx_laser",
+  "label": "Laser",
+  "source": "Disintesis oleh skrip (domain publik)",
+  "license": "CC0"
+ },
+ {
+  "id": "sfx_click",
+  "label": "Klik",
+  "source": "Disintesis oleh skrip (domain publik)",
+  "license": "CC0"
+ },
+ {
+  "id": "sfx_gong",
+  "label": "Gong",
+  "source": "Disintesis oleh skrip (domain publik)",
+  "license": "CC0"
+ },
+ {
+  "id": "sfx_horn",
+  "label": "Terompet",
+  "source": "Disintesis oleh skrip (domain publik)",
+  "license": "CC0"
+ },
+ {
+  "id": "sfx_bubble",
+  "label": "Gelembung",
+  "source": "Disintesis oleh skrip (domain publik)",
+  "license": "CC0"
+ }
+]

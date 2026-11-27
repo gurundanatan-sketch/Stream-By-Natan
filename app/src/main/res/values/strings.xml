@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Stream By Natan</string>
+    <string name="notif_channel_live">Siaran langsung</string>
+    <string name="notif_channel_reminder">Pengingat jadwal live</string>
+    <string name="notif_channel_update">Pembaruan aplikasi</string>
+</resources>

@@ -1,0 +1,9 @@
+# Daftar efek suara dari Wikimedia Commons (satu per baris).
+# Bisa berupa judul "File:Nama.ogg" atau link langsung https://upload.wikimedia.org/...
+# Skrip juga mencari otomatis di Commons sampai total 200 efek suara.
+# Tambahkan sendiri di sini kalau mau efek suara tertentu.
+File:Applause.ogg
+File:Ding.ogg
+File:Whoosh.ogg
+File:Drum roll.ogg
+File:Gong.ogg

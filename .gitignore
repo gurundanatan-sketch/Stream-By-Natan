@@ -1,0 +1,24 @@
+# Gradle / Android Studio
+.gradle/
+build/
+/app/build/
+local.properties
+captures/
+.idea/
+*.iml
+.cxx/
+.externalNativeBuild/
+
+# Rahasia - JANGAN diunggah
+app/google-services.json
+*.jks
+*.keystore
+*.base64.txt
+signing/
+secrets.properties
+
+# Lain-lain
+.DS_Store
+*.log
+__pycache__/
+out/
