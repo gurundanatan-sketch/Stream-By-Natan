@@ -28,8 +28,6 @@ jobs:
           java-version: '17'
           cache: gradle
 
-      - name: Pasang Android SDK
-        uses: android-actions/setup-android@v3
 
       - name: Pasang Python
         uses: actions/setup-python@v5
