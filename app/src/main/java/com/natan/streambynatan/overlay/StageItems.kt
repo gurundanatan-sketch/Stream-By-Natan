@@ -44,13 +44,13 @@ class CardItem(
 ) : StageView.Item(fullScreen = true) {
     private val bg = Paint(Paint.ANTI_ALIAS_FLAG)
     private val textPaint = TextPaint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = style.textColor; typeface = Typeface.create(Typeface.SERIF, Typeface.BOLD)
+        color = this@CardItem.style.textColor; typeface = Typeface.create(Typeface.SERIF, Typeface.BOLD)
     }
     private val footPaint = TextPaint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = style.accentColor; typeface = Typeface.create(Typeface.SANS_SERIF, Typeface.BOLD)
+        color = this@CardItem.style.accentColor; typeface = Typeface.create(Typeface.SANS_SERIF, Typeface.BOLD)
     }
     private val headPaint = TextPaint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = style.accentColor; typeface = Typeface.create(Typeface.SANS_SERIF, Typeface.BOLD); letterSpacing = 0.15f
+        color = this@CardItem.style.accentColor; typeface = Typeface.create(Typeface.SANS_SERIF, Typeface.BOLD); letterSpacing = 0.15f
     }
 
     override fun draw(c: Canvas, w: Int, h: Int, elapsedMs: Long) {
@@ -125,7 +125,7 @@ class ImageItem(
 class QrItem(private val link: String, private val style: QrStyle) : StageView.Item(fullScreen = style.size == "full") {
     private val qr: Bitmap = makeQr(link, 600, style.fgColor, style.bgColor)
     private val p = Paint(Paint.ANTI_ALIAS_FLAG)
-    private val t = TextPaint(Paint.ANTI_ALIAS_FLAG).apply { color = style.textColor; typeface = Typeface.DEFAULT_BOLD }
+    private val t = TextPaint(Paint.ANTI_ALIAS_FLAG).apply { color = this@QrItem.style.textColor; typeface = Typeface.DEFAULT_BOLD }
 
     override fun draw(c: Canvas, w: Int, h: Int, elapsedMs: Long) {
         if (style.size == "full") {
