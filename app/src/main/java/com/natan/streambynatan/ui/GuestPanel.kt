@@ -72,7 +72,7 @@ fun GuestPanel(activity: MainActivity) {
         Text("Ruang tunggu: ${waiting.size} orang", style = MaterialTheme.typography.titleMedium)
         if (waiting.isEmpty()) Text("Belum ada yang menunggu.", color = Neon.Muted)
         waiting.forEachIndexed { i, r ->
-            SwitchRow("${i + 1}. ${r.name}", r.id in selected, "Datang ${fmt.format(Date(r.joinedAt))}") { on ->
+            SwitchRow("${i + 1}. ${r.name}", r.id in selected, "Datang ${fmt.format(Date(r.joinedAt))}${if (r.mode == "camera") " · kamera tambahan" else ""}") { on ->
                 selected = if (on) selected + r.id else selected - r.id
             }
         }

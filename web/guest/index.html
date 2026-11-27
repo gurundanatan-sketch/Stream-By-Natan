@@ -29,8 +29,9 @@
   <p class="muted" id="intro">Kamu diundang ke siaran Stream By Natan.</p>
 
   <section class="card" id="joinCard">
-    <label for="name">Nama kamu</label>
-    <input id="name" autocomplete="name" placeholder="Contoh: Budi">
+    <label for="name">Nama kamu (wajib)</label>
+    <input id="name" autocomplete="name" placeholder="Contoh: Budi" required minlength="2" maxlength="30" aria-describedby="nameHint">
+    <p id="nameHint" class="hint">Nama ini tampil di ruang tunggu host dan di layar siaran.</p>
     <button id="joinBtn">Masuk ruang tunggu</button>
   </section>
 

@@ -101,7 +101,7 @@ class GuestManager(private val context: Context) {
                     val status = d.getString("status") ?: "waiting"
                     if (status == "left" || status == "kicked") { drop(d.id, notify = false); return@forEach }
                     val r = remotes.getOrPut(d.id) {
-                        Remote(d.id, d.getString("name") ?: "Tamu", d.getString("mode") ?: "guest", d.getLong("joinedAt") ?: System.currentTimeMillis())
+                        Remote(d.id, uniqueName(GuestClient.cleanName(d.getString("name").orEmpty()).ifBlank { "Tamu" }), d.getString("mode") ?: "guest", d.getLong("joinedAt") ?: System.currentTimeMillis())
                             .also { if (it.mode == "guest") LiveBus.announce("${it.name} masuk ruang tunggu") }
                     }
                     r.micOn = d.getBoolean("micOn") ?: true
@@ -119,6 +119,15 @@ class GuestManager(private val context: Context) {
         started = true
         main.post(statsTick)
         return true
+    }
+
+    /** Kalau dua tamu memakai nama sama, yang berikutnya diberi nomor (Budi, Budi 2) supaya host bisa membedakan. */
+    private fun uniqueName(name: String): String {
+        val taken = remotes.values.map { it.name.lowercase() }.toSet()
+        if (name.lowercase() !in taken) return name
+        var i = 2
+        while ("$name $i".lowercase() in taken) i++
+        return "$name $i"
     }
 
     private fun publish() {

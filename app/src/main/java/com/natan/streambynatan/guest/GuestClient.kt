@@ -53,6 +53,7 @@ class GuestClient(private val context: Context) {
         val camOn: Boolean = true,
         val sharing: Boolean = false,
         val frontCamera: Boolean = true,
+        val myName: String = "",
     )
     enum class Phase { IDLE, WAITING, CONNECTING, ONSTAGE, KICKED, LEFT, ERROR }
 
@@ -139,8 +140,10 @@ class GuestClient(private val context: Context) {
         }
         val col = store.collection("rooms").document(room).collection("peers")
         val ref = col.document(); peerRef = ref
+        val shown = cleanName(name).ifBlank { if (mode == "camera") "Kamera tambahan" else "Tamu" }
+        set { it.copy(myName = shown) }
         ref.set(mapOf(
-            "name" to name.ifBlank { if (mode == "camera") "Kamera tambahan" else "Tamu" },
+            "name" to shown,
             "mode" to mode, "status" to "waiting", "joinedAt" to System.currentTimeMillis(),
             "micOn" to (mode == "guest"), "screen" to false, "app" to "android",
         ))
@@ -320,5 +323,12 @@ class GuestClient(private val context: Context) {
         camCapturer = null; camTrack = null; camSource = null; camHelper = null; audioTrack = null
         peerRef = null; lastHostMute = 0L
         GuestService.stop(context)
+    }
+
+    companion object {
+        const val MAX_NAME = 30
+        /** Merapikan nama tamu: tanpa spasi berlebih & karakter aneh, maksimal 30 huruf. */
+        fun cleanName(raw: String): String =
+            raw.replace(Regex("[\\p{Cntrl}<>]"), "").replace(Regex("\\s+"), " ").trim().take(MAX_NAME)
     }
 }

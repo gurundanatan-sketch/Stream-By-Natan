@@ -60,7 +60,10 @@ fun GuestJoinScreen(activity: MainActivity, invite: GuestInvite, onClose: () -> 
         .all { ContextCompat.checkSelfPermission(activity, it) == PackageManager.PERMISSION_GRANTED }
     var perms by remember { mutableStateOf(hasPerms()) }
     var cameraReady by remember { mutableStateOf(false) }
-    var name by remember { mutableStateOf(Graph.firebase.displayName.orEmpty()) }
+    val prefs = remember { activity.getSharedPreferences("tamu", android.content.Context.MODE_PRIVATE) }
+    // nama terakhir yang dipakai diingat, supaya tamu tidak perlu mengetik lagi
+    var name by remember { mutableStateOf(prefs.getString(if (isCamera) "nama_kamera" else "nama", null) ?: Graph.firebase.displayName.orEmpty()) }
+    var nameError by remember { mutableStateOf<String?>(null) }
     val askPerms = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { perms = hasPerms() }
 
     LaunchedEffect(perms) {
@@ -110,6 +113,7 @@ fun GuestJoinScreen(activity: MainActivity, invite: GuestInvite, onClose: () -> 
         if (ui.status.isNotBlank()) {
             GlassCard(Modifier.semantics { liveRegion = LiveRegionMode.Polite }) {
                 Text(ui.status, style = MaterialTheme.typography.titleMedium)
+                if (ui.myName.isNotBlank()) Text("Tampil sebagai: ${ui.myName}", color = Neon.Cyan)
                 if (ui.phase == GuestClient.Phase.WAITING && ui.queueSize > 0) {
                     Text("Antrean ke-${ui.queuePos} dari ${ui.queueSize}", color = Neon.Muted)
                 }
@@ -119,9 +123,23 @@ fun GuestJoinScreen(activity: MainActivity, invite: GuestInvite, onClose: () -> 
         when (ui.phase) {
             GuestClient.Phase.IDLE -> GlassCard {
                 Text("Kode ruang: ${invite.room}", color = Neon.Muted)
-                Field(if (isCamera) "Nama kamera (misal: kamera mimbar)" else "Nama kamu", name) { name = it }
+                Text(
+                    if (isCamera) "Beri nama kamera ini supaya host tahu kamera mana yang tersambung."
+                    else "Nama wajib diisi. Nama ini tampil di ruang tunggu host dan di layar siaran, jadi penonton juga tahu siapa kamu.",
+                    color = Neon.Muted,
+                )
+                Field(if (isCamera) "Nama kamera (misal: kamera mimbar)" else "Nama kamu (wajib)", name) {
+                    name = it.take(GuestClient.MAX_NAME); nameError = null
+                }
+                nameError?.let { Text(it, color = Neon.Red, modifier = Modifier.semantics { liveRegion = LiveRegionMode.Assertive }) }
                 NeonButton(if (isCamera) "Sambungkan kamera" else "Masuk ruang tunggu", enabled = perms, icon = Icons.Filled.Login) {
-                    gc.join(invite.room, name.trim(), invite.mode)
+                    val clean = GuestClient.cleanName(name)
+                    if (clean.length < 2) {
+                        nameError = if (isCamera) "Isi nama kamera dulu, minimal 2 huruf." else "Isi nama kamu dulu, minimal 2 huruf."
+                    } else {
+                        prefs.edit().putString(if (isCamera) "nama_kamera" else "nama", clean).apply()
+                        gc.join(invite.room, clean, invite.mode)
+                    }
                 }
                 GhostButton("Batal") { close() }
             }

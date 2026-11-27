@@ -13,6 +13,8 @@
     document.querySelector('label[for=name]').textContent = 'Nama kamera (misal: kamera mimbar)';
   }
 
+  try { const saved = localStorage.getItem(mode === 'camera' ? 'sbn_nama_kamera' : 'sbn_nama'); if (saved) $('name').value = saved; } catch (e) {}
+
   firebase.initializeApp(window.FIREBASE_CONFIG);
   const db = firebase.firestore();
   const peersCol = db.collection('rooms').doc(room).collection('peers');
@@ -29,7 +31,13 @@
   }
 
   $('joinBtn').onclick = async () => {
-    const name = $('name').value.trim() || (mode === 'camera' ? 'Kamera tambahan' : 'Tamu');
+    const name = $('name').value.replace(/[<>\u0000-\u001f]/g, '').replace(/\s+/g, ' ').trim().slice(0, 30);
+    if (name.length < 2) {
+      alertStatus(mode === 'camera' ? 'Isi nama kamera dulu, minimal 2 huruf.' : 'Isi nama kamu dulu, minimal 2 huruf. Nama ini tampil di ruang tunggu host dan di layar siaran.');
+      $('name').focus();
+      return;
+    }
+    try { localStorage.setItem(mode === 'camera' ? 'sbn_nama_kamera' : 'sbn_nama', name); } catch (e) {}
     $('joinBtn').disabled = true;
     try { camStream = await getCamera(); }
     catch (e) { alertStatus('Izin kamera/mikrofon ditolak. Izinkan lalu coba lagi.'); $('joinBtn').disabled = false; return; }
