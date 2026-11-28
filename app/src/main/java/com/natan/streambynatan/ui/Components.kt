@@ -282,3 +282,38 @@ fun NavRow(title: String, subtitle: String, icon: ImageVector, onClick: () -> Un
         }
     }
 }
+
+/** Tombol pilihan kecil (filter, kualitas, posisi). Pembaca layar membaca "dipilih". */
+@Composable
+fun FilterChipButton(label: String, selected: Boolean, onClick: () -> Unit) {
+    Box(
+        Modifier
+            .clip(RoundedCornerShape(18.dp))
+            .background(if (selected) Neon.Violet else Neon.Glass)
+            .border(1.dp, if (selected) Neon.Pink else Neon.Line, RoundedCornerShape(18.dp))
+            .clickable(role = Role.Button, onClickLabel = label, onClick = onClick)
+            .semantics { stateDescription = if (selected) "dipilih" else "" }
+            .padding(horizontal = 14.dp, vertical = 10.dp),
+    ) { Text(label, style = MaterialTheme.typography.bodyMedium, color = Neon.Text) }
+}
+
+/** Ikon bulat di pojok atas (akun, kotak saran) dengan angka pemberitahuan opsional. */
+@Composable
+fun TopIconButton(icon: ImageVector, description: String, badge: Int = 0, onClick: () -> Unit) {
+    Box(
+        Modifier
+            .size(48.dp)
+            .clip(CircleShape)
+            .background(Neon.Glass)
+            .border(1.dp, Neon.Line, CircleShape)
+            .clickable(role = Role.Button, onClickLabel = description, onClick = onClick)
+            .semantics { contentDescription = if (badge > 0) "$description, $badge baru" else description },
+        contentAlignment = Alignment.Center,
+    ) {
+        Icon(icon, null, tint = Neon.Cyan, modifier = Modifier.size(26.dp))
+        if (badge > 0) Box(
+            Modifier.align(Alignment.TopEnd).size(18.dp).clip(CircleShape).background(Neon.Pink),
+            contentAlignment = Alignment.Center,
+        ) { Text(if (badge > 9) "9+" else "$badge", style = MaterialTheme.typography.labelMedium, color = Color.White) }
+    }
+}

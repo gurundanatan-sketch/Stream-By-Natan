@@ -14,3 +14,10 @@ p{color:var(--muted)}
 .btn.ghost{background:transparent}
 .btn:focus-visible{outline:3px solid var(--cyan);outline-offset:3px}
 [hidden]{display:none!important}
+.avatar{width:96px;height:96px;border-radius:50%;object-fit:cover;border:2px solid var(--cyan);background:var(--deep)}
+.live-dot{display:inline-block;padding:3px 10px;border-radius:999px;background:#FF3DA8;color:#070A14;font-weight:700;font-size:13px}
+.list{display:flex;flex-direction:column;gap:10px}
+.person{display:flex;gap:12px;align-items:center;text-decoration:none;color:var(--text);padding:10px;border-radius:16px;background:#ffffff0a;border:1px solid #ffffff1a}
+.person img{width:52px;height:52px;border-radius:50%;object-fit:cover;background:var(--deep)}
+.person span{color:var(--muted);font-size:14px;display:block}
+.card h3{margin:0;font-size:16px}

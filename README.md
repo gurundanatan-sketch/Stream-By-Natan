@@ -60,6 +60,13 @@ APK ada di tab **Actions** (artifact `StreamByNatan-apk`) dan di halaman **Relea
 
 ## 4. Pengaturan Firebase (sekali saja)
 
+Setiap kali `firestore.rules` atau folder `web/` berubah, jalankan dari Termux:
+
+```
+firebase deploy --only firestore:rules,hosting --project stream-by-natan-29448
+```
+
+
 1. Buat proyek di Firebase Console.
 2. Tambahkan aplikasi Android dengan nama paket `com.natan.streambynatan`, lalu isi **SHA-1 dan SHA-256** dari `signing/BACA-SAYA.txt`.
 3. Unduh `google-services.json`, lalu salin isinya ke secret `GOOGLE_SERVICES_JSON`.
@@ -114,7 +121,7 @@ python scripts/download_assets.py
 **Layar siaran**
 - Teks overlay, teks berjalan (di atas subtitle), subtitle otomatis paling bawah
 - Pengumuman otomatis berkala, kartu ayat penuh layar dari naskah atau dari suaramu
-- Naskah khotbah dibisikkan pelan mengikuti suaramu, lirik pujian mengikuti nyanyian
+- Catatan live dibisikkan pelan mengikuti suaramu (atau tampil sebagai teks di layar host kalau bantuan suara mati), lirik Live music mengikuti nyanyian
 - Info persembahan/QRIS, notifikasi Saweria lewat link overlay, kode QR Saweria (ukuran, posisi, lama, warna bisa diatur)
 - Layar pembuka & penutup sinematik (9 template) dengan 15 gaya transisi
 - Pengganti latar belakang (gambar/video/buram), asisten posisi kamera, penyesuai cahaya
@@ -138,17 +145,42 @@ python scripts/download_assets.py
 
 **Setelah live**
 - Ringkasan live, perkembangan antar-live (hari & jam terbaik)
-- Rekaman otomatis dipotong per pertanyaan dan per poin khotbah, dengan judul sesuai pertanyaan/poin, tanpa batas durasi
+- Rekaman otomatis dipotong per pertanyaan, per poin Catatan live, dan **per tamu** (dari masuk sampai keluar), dengan judul sesuai pertanyaan/poin, tanpa batas durasi
 - Pustaka rekaman di dalam aplikasi: putar, unduh ke folder Download, bagikan, hapus
 - Transkrip live (opsional)
 - Pembaruan otomatis dari GitHub Releases
 
-## Yang sengaja tidak dimasukkan (dilewati saat diskusi)
-Giveaway (ditunda), peringatan baterai/suhu, terjemahan suara, balas komentar pakai suara, tombol jeda layar,
-pengingat minum & istirahat, daftar lagu permintaan, peringatan live sepi, kuis tebak-tebakan,
-riwayat & pencarian komentar, platform tambahan (Facebook/RTMP lain), kunci sentuhan, getaran penanda,
-cuplikan Shorts, kendali tombol earphone, zoom & senter lewat suara, susunan acara, mode latihan khotbah,
-papan nama di layar, simpan ke Google Drive.
+**Tata letak baru**
+- Sebelum live: ikon atas (Akun, Pengaturan), saklar platform, satu baris sumber & profil, tombol Mulai besar, opsi tambahan bisa dilipat
+- Saat live: kamera layar penuh seperti TikTok, status di atas, komentar mengambang, bilah bawah **Tamu / Alat / Bagikan / Sempurnakan / Lainnya**
+- **Alat**: ganti kamera manual atau tambah kamera (webcam USB, HP lain), perintah suara ganti kamera tetap ada, giveaway, kuis, request lagu, rundown
+- **Bagikan**: bagikan link live ke WhatsApp, Telegram, Facebook, Instagram, X, LINE, Messenger, SMS, email, dll, plus tombol salin link
+- **Sempurnakan**: 21 filter + kecerahan/kontras/saturasi, latar, impor gambar dari galeri ke layar, overlay gambar/video, **TEMA**, teks layar, efek suara, efek mikrofon, pengubah suara (robot, tinggi, chipmunk, berat, raksasa, gema, telepon), musik latar dari galeri dengan volume
+- **Lainnya**: tampilan komentar, kualitas 480/720/1080/otomatis, musik mengecil otomatis saat host bicara (tidak mati), dll
+
+**Fitur tambahan (semua opsional, Pengaturan > Semua fitur / Alat live)**
+- Giveaway lewat kata komentar, kuis, request lagu, rundown acara, laporan latihan Catatan live
+- Peringatan baterai & suhu, pengingat minum, peringatan live sepi (dengan ide topik)
+- Balas komentar YouTube dengan suara ("balas …"), tombol jeda layar (tulisan/gambar sendiri), kunci sentuh
+- Papan nama di layar, getar/suara/TTS per kejadian (Pengaturan > Getar, suara & TTS per kejadian)
+- Platform tambahan: Facebook, Instagram, dan 2 RTMP bebas
+- **TEMA**: ucapkan "tema" + judul, gambar tema tampil layar penuh (judul & gambar diatur sendiri)
+
+**Tamu & moderator**
+- Label "lewat aplikasi" / "lewat browser", chat ruang tunggu (disensor kata kasar, host bisa membalas, dibacakan TTS di mode tunanetra)
+- Tamu bisa ganti kamera depan/belakang dan memilih filter (21 pilihan, di aplikasi maupun browser)
+- Ruang tamu bisa dibuka sebelum live
+- Moderator (lewat username atau link undangan) punya semua hak kelola tamu dari HP-nya sendiri
+
+**Akun & sosial**
+- Menu Akun (ikon kanan atas): profil (foto, nama, username, bio, tautan), edit & **bagikan profil**, kritik & saran, Tentang aplikasi (panduan & profil pembuat), kebijakan privasi, bahasa (Indonesia bawaan + bahasa dunia & daerah), Tampilan (tema gelap/terang, teks besar, kontras tinggi), izin setelan terbatas, Keluar, Beralih akun, Hapus akun
+- Ikuti kreator + notifikasi saat mereka live, jadwal live dengan pengingat, halaman profil publik `/@username`, daftar "Sedang live sekarang" di beranda web
+- Pertama kali dibuka: tutorial 6 bagian (bisa dilewati), pilihan mode pembaca layar, izin (termasuk foto/video & musik/audio), login
+- Khusus pembuat (7 email): Kotak saran dengan badge, kunci Euler & YouTube API disimpan di Firestore (`private/creatorKeys`), hanya bisa dibaca akun pembuat; tidak ada di dalam APK
+
+## Belum dimasukkan
+Terjemahan suara, riwayat & pencarian komentar, cuplikan Shorts, kendali tombol earphone, zoom & senter lewat suara,
+simpan ke Google Drive. Versi desktop & iOS menyusul setelah rilis Android.
 
 ## Penyimpanan
 - Efek suara dan musik hasil unduhan GitHub Actions ada **di dalam APK** (`res/raw`), jadi **tidak pernah muncul di galeri**.

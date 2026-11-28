@@ -195,3 +195,46 @@ class CinematicItem(
         painter.draw(c, w, h, elapsedMs, title, subtitle, if (countdown) ((totalMs - elapsedMs) / 1000 + 1).toInt().coerceAtLeast(0) else -1)
     }
 }
+
+
+/** Overlay video dari galeri (misal untuk review): diputar berulang sebagai rangkaian bingkai. */
+class VideoOverlayItem(
+    private val frames: List<Bitmap>,
+    private val size: String,
+    private val position: String,
+    private val fps: Int = 8,
+) : StageView.Item(fullScreen = size == "full") {
+    private val p = Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG)
+    override fun draw(c: Canvas, w: Int, h: Int, elapsedMs: Long) {
+        if (frames.isEmpty()) return
+        val b = frames[((elapsedMs * fps / 1000) % frames.size).toInt()]
+        if (b.isRecycled) return
+        val r = placeRect(size, position, w, h, b.width / b.height.toFloat())
+        if (size == "full") {
+            p.color = Color.BLACK; c.drawRect(r, p)
+            val s = min(w / b.width.toFloat(), h / b.height.toFloat())
+            val dw = b.width * s; val dh = b.height * s
+            c.drawBitmap(b, null, RectF((w - dw) / 2, (h - dh) / 2, (w + dw) / 2, (h + dh) / 2), p)
+        } else {
+            p.color = 0xCC22E5FF.toInt()
+            c.drawRoundRect(RectF(r.left - 6, r.top - 6, r.right + 6, r.bottom + 6), 22f, 22f, p)
+            c.drawBitmap(b, null, r, p)
+        }
+    }
+
+    companion object {
+        /** Mengambil bingkai dari video galeri (maks 20 detik, 8 bingkai per detik, ukuran kecil supaya ringan). */
+        fun load(context: android.content.Context, uri: android.net.Uri, maxSeconds: Int = 20, fps: Int = 8): List<Bitmap> = runCatching {
+            val r = android.media.MediaMetadataRetriever(); r.setDataSource(context, uri)
+            val dur = (r.extractMetadata(android.media.MediaMetadataRetriever.METADATA_KEY_DURATION)?.toLongOrNull() ?: 5000).coerceAtMost(maxSeconds * 1000L)
+            val count = (dur * fps / 1000).toInt().coerceIn(1, maxSeconds * fps)
+            val list = (0 until count).mapNotNull { i ->
+                r.getFrameAtTime(dur * 1000 * i / count, android.media.MediaMetadataRetriever.OPTION_CLOSEST)?.let { f ->
+                    val s = 360f / maxOf(f.width, f.height)
+                    if (s < 1f) Bitmap.createScaledBitmap(f, (f.width * s).toInt(), (f.height * s).toInt(), true) else f
+                }
+            }
+            r.release(); list
+        }.getOrDefault(emptyList())
+    }
+}

@@ -12,6 +12,8 @@ import androidx.compose.material.icons.filled.MicOff
 import androidx.compose.material.icons.filled.PersonAdd
 import androidx.compose.material.icons.filled.PersonRemove
 import androidx.compose.material.icons.filled.Share
+import androidx.compose.material.icons.filled.Reply
+import androidx.compose.material.icons.filled.Send
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -46,8 +48,10 @@ fun GuestPanel(activity: MainActivity) {
 
     SectionTitle("Tamu live")
     if (!gm.started) {
+        Text("Ruang tamu bisa dibuka sebelum live, supaya tamu sudah antre lebih dulu.", color = Neon.Muted)
         GhostButton("Buka ruang tamu", icon = Icons.Filled.GroupAdd) {
             if (!gm.start(s.guest)) activity.message.value = "Firebase belum diatur, tamu belum bisa dipakai."
+            else if (!s.features.guests) Graph.settings.update { it.copy(features = it.features.copy(guests = true)) }
         }
         return
     }
@@ -72,7 +76,7 @@ fun GuestPanel(activity: MainActivity) {
         Text("Ruang tunggu: ${waiting.size} orang", style = MaterialTheme.typography.titleMedium)
         if (waiting.isEmpty()) Text("Belum ada yang menunggu.", color = Neon.Muted)
         waiting.forEachIndexed { i, r ->
-            SwitchRow("${i + 1}. ${r.name}", r.id in selected, "Datang ${fmt.format(Date(r.joinedAt))}${if (r.mode == "camera") " · kamera tambahan" else ""}") { on ->
+            SwitchRow("${i + 1}. ${r.name}", r.id in selected, "${r.viaLabel} · datang ${fmt.format(Date(r.joinedAt))}${if (r.mode == "camera") " · kamera tambahan" else ""}") { on ->
                 selected = if (on) selected + r.id else selected - r.id
             }
         }
@@ -98,12 +102,30 @@ fun GuestPanel(activity: MainActivity) {
                 r.sharingScreen -> "berbagi layar"
                 else -> "kamera"
             }
-            Text("${r.name} · $state · mic ${if (r.micOn) "menyala" else "mati"}", style = MaterialTheme.typography.bodyLarge)
+            Text("${r.name} · ${r.viaLabel} · $state · mic ${if (r.micOn) "menyala" else "mati"}" +
+                if (r.filter != "normal") " · filter ${com.natan.streambynatan.features.Filters.byId(r.filter).label}" else "", style = MaterialTheme.typography.bodyLarge)
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 GhostButton("Bisukan mic", Modifier.weight(1f), Icons.Filled.MicOff) { gm.muteGuest(r.id) }
                 GhostButton("Keluarkan", Modifier.weight(1f), Icons.Filled.PersonRemove) { gm.kick(r.id) }
             }
         }
         Text("Saat hanya satu orang berbicara, layarnya otomatis penuh. Kalau tidak ada atau beberapa orang bicara bersamaan, ukuran layar sama.", color = Neon.Muted)
+    }
+
+    // Pesan dari tamu (ruang tunggu maupun yang sedang tampil), bisa dibalas
+    val messages by com.natan.streambynatan.live.LiveBus.guestMessages.collectAsState()
+    var replyTo by remember { mutableStateOf<String?>(null) }
+    var reply by remember { mutableStateOf("") }
+    GlassCard(Modifier.semantics { liveRegion = LiveRegionMode.Polite }) {
+        Text("Pesan tamu (${messages.size})", style = MaterialTheme.typography.titleMedium)
+        if (messages.isEmpty()) Text("Belum ada pesan.", color = Neon.Muted)
+        messages.takeLast(15).forEach { (peerId, name, text) ->
+            Text("$name: $text", style = MaterialTheme.typography.bodyLarge)
+            if (!name.startsWith("Kamu")) GhostButton("Balas $name", icon = Icons.Filled.Reply) { replyTo = peerId }
+        }
+        replyTo?.let { id ->
+            Field("Balasan untuk ${gm.remotes[id]?.name ?: "tamu"}", reply) { reply = it.take(300) }
+            GhostButton("Kirim balasan", icon = Icons.Filled.Send) { gm.reply(id, reply); reply = ""; replyTo = null }
+        }
     }
 }

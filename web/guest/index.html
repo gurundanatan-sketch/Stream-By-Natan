@@ -20,6 +20,11 @@
   .row{display:flex;gap:10px}.row button{flex:1}
   .status{font-size:18px;line-height:1.5}
   .muted{color:var(--muted)}
+  select,textarea{width:100%;font-size:17px;padding:12px;border-radius:14px;border:1px solid var(--line);background:var(--deep);color:var(--text)}
+  .msgs{max-height:220px;overflow:auto;display:flex;flex-direction:column;gap:6px;margin:8px 0}
+  .msg{padding:8px 12px;border-radius:14px;background:rgba(255,255,255,.08);max-width:90%}
+  .msg.me{align-self:flex-end;background:rgba(34,229,255,.18)}
+  .msg b{display:block;font-size:13px;color:var(--cyan)}
   [hidden]{display:none!important}
 </style>
 </head>
@@ -47,7 +52,16 @@
     </div>
     <button class="ghost" id="screenBtn">Bagikan layar</button>
     <button class="ghost" id="flipBtn">Ganti kamera depan/belakang</button>
+    <label for="filterSel" style="margin-top:12px">Filter video</label>
+    <select id="filterSel"></select>
     <button class="ghost" id="leaveBtn">Keluar</button>
+  </section>
+  <section class="card" id="chatCard" hidden>
+    <h2 style="margin:0 0 6px;font-size:18px">Pesan untuk host</h2>
+    <div class="msgs" id="msgs" role="log" aria-live="polite" aria-label="Percakapan dengan host"></div>
+    <label for="msgInput" class="muted">Tulis pesan (kata kasar akan disensor)</label>
+    <input id="msgInput" maxlength="300" placeholder="Contoh: Saya siap, Kak">
+    <button class="ghost" id="sendBtn">Kirim pesan</button>
   </section>
   <audio id="hostAudio" autoplay></audio>
 </main>

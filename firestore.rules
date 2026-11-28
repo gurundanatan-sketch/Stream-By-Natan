@@ -1,19 +1,103 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{db}/documents {
+
+    function signedIn() { return request.auth != null; }
+    function isMe(uid) { return signedIn() && request.auth.uid == uid; }
+    // Akun pembuat aplikasi: email harus sudah terverifikasi (login Google otomatis terverifikasi)
+    function isCreator() {
+      return signedIn()
+        && request.auth.token.email_verified == true
+        && request.auth.token.email in [
+          'natsenterteiment@gmail.com',
+          'hebronisland@gmail.com',
+          'gurundanatan@gmail.com',
+          'pengikutmesias77@gmail.com',
+          'gevarielimanuel1@gmail.com',
+          'gevarielimanuel884@gmail.com',
+          'natanelliaha16@gmail.com'
+        ];
+    }
+    function isModOf(hostUid) {
+      return signedIn() && exists(/databases/$(db)/documents/profiles/$(hostUid)/moderators/$(request.auth.uid));
+    }
+
     // Data pribadi host (cadangan pengaturan, penonton setia, ringkasan live, token notifikasi)
     match /users/{uid}/{document=**} {
-      allow read, write: if request.auth != null && request.auth.uid == uid;
+      allow read, write: if isMe(uid);
     }
-    // Ruang tamu live: host (login) membuat ruangan, tamu dari browser boleh antre & bertukar sinyal WebRTC
+
+    // Kunci khusus pembuat (Euler, YouTube API). Hanya akun pembuat.
+    match /private/{doc} {
+      allow read, write: if isCreator();
+    }
+
+    // Profil publik (halaman /@username, daftar "Sedang live")
+    match /profiles/{uid} {
+      allow read: if true;
+      allow write: if isMe(uid);
+
+      // Kode undangan moderator: hanya pemilik
+      match /secret/{doc} {
+        allow read, write: if isMe(uid);
+      }
+      // Daftar moderator host
+      match /moderators/{mod} {
+        allow read: if isMe(uid) || isMe(mod);
+        allow write: if isMe(uid);
+        // Moderator menerima undangan lewat link (kode harus cocok)
+        allow create: if isMe(mod)
+          && request.resource.data.code == get(/databases/$(db)/documents/profiles/$(uid)/secret/modInvite).data.code;
+        allow delete: if isMe(mod);
+      }
+    }
+
+    // Username unik
+    match /usernames/{name} {
+      allow read: if true;
+      allow create: if signedIn() && request.resource.data.uid == request.auth.uid;
+      allow delete: if signedIn() && resource.data.uid == request.auth.uid;
+    }
+
+    // Kreator yang diikuti
+    match /follows/{uid}/{document=**} {
+      allow read, write: if isMe(uid);
+    }
+
+    // Host yang saya moderatori
+    match /moderating/{uid}/hosts/{host} {
+      allow read: if isMe(uid);
+      allow write: if isMe(uid) || isMe(host);
+    }
+
+    // Kotak saran: semua pengguna login boleh kirim, hanya pembuat yang membaca
+    match /feedback/{id} {
+      allow create: if signedIn() && request.resource.data.text is string && request.resource.data.text.size() <= 2000;
+      allow read, update, delete: if isCreator();
+    }
+
+    // Ruang tamu live: host (login) membuat ruangan, tamu dari browser/aplikasi antre & bertukar sinyal WebRTC
     match /rooms/{room} {
       allow read: if true;
-      allow write: if request.auth != null;
+      allow create: if signedIn();
+      allow update, delete: if signedIn()
+        && (!('hostUid' in resource.data) || resource.data.hostUid == request.auth.uid);
+
       match /peers/{peer} {
-        allow read, create: if true;
-        allow update: if true;
-        allow delete: if request.auth != null;
+        allow read, create, update: if true;
+        allow delete: if signedIn();
+        // Sinyal WebRTC, kandidat ICE, dan chat ruang tunggu
         match /{sub=**} { allow read, write: if true; }
+      }
+
+      // Perintah moderator ke HP host
+      match /commands/{cmd} {
+        allow read: if signedIn();
+        allow create: if signedIn() && (
+          get(/databases/$(db)/documents/rooms/$(room)).data.hostUid == request.auth.uid
+          || isModOf(get(/databases/$(db)/documents/rooms/$(room)).data.hostUid));
+        allow update, delete: if signedIn()
+          && get(/databases/$(db)/documents/rooms/$(room)).data.hostUid == request.auth.uid;
       }
     }
   }

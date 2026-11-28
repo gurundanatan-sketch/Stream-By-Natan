@@ -27,53 +27,71 @@ import androidx.compose.ui.unit.sp
 import kotlin.math.cos
 import kotlin.math.sin
 
-/** Palet futuristik: hitam angkasa, neon sian, ungu, dan merah muda. */
+/** Palet futuristik: hitam angkasa, neon sian, ungu, dan merah muda. Bisa terang / kontras tinggi (menu Tampilan). */
 object Neon {
-    val Void = Color(0xFF070A14)
-    val Deep = Color(0xFF0B1022)
-    val Glass = Color(0x1AFFFFFF)
-    val GlassStrong = Color(0x29FFFFFF)
-    val Line = Color(0x33FFFFFF)
-    val Cyan = Color(0xFF22E5FF)
-    val Violet = Color(0xFF8B5CFF)
-    val Pink = Color(0xFFFF3DA8)
-    val Lime = Color(0xFF7CFFB2)
-    val Amber = Color(0xFFFFC86B)
-    val Red = Color(0xFFFF4D6D)
-    val Text = Color(0xFFF2F5FF)
-    val Muted = Color(0xFFA6B0CF)
-    val brand = Brush.linearGradient(listOf(Cyan, Violet, Pink))
-    val brandH = Brush.horizontalGradient(listOf(Cyan, Violet, Pink))
-    val live = Brush.horizontalGradient(listOf(Pink, Red))
-}
+    var Void = Color(0xFF070A14); private set
+    var Deep = Color(0xFF0B1022); private set
+    var Glass = Color(0x1AFFFFFF); private set
+    var GlassStrong = Color(0x29FFFFFF); private set
+    var Line = Color(0x33FFFFFF); private set
+    var Cyan = Color(0xFF22E5FF); private set
+    var Violet = Color(0xFF8B5CFF); private set
+    var Pink = Color(0xFFFF3DA8); private set
+    var Lime = Color(0xFF7CFFB2); private set
+    var Amber = Color(0xFFFFC86B); private set
+    var Red = Color(0xFFFF4D6D); private set
+    var Text = Color(0xFFF2F5FF); private set
+    var Muted = Color(0xFFA6B0CF); private set
+    var isLight = false; private set
+    var textScale = 1f; private set
+    val brand get() = Brush.linearGradient(listOf(Cyan, Violet, Pink))
+    val brandH get() = Brush.horizontalGradient(listOf(Cyan, Violet, Pink))
+    val live get() = Brush.horizontalGradient(listOf(Pink, Red))
 
-private val scheme = darkColorScheme(
-    primary = Neon.Cyan, onPrimary = Neon.Void,
-    secondary = Neon.Violet, onSecondary = Color.White,
-    tertiary = Neon.Pink,
-    background = Neon.Void, onBackground = Neon.Text,
-    surface = Neon.Deep, onSurface = Neon.Text,
-    surfaceVariant = Color(0xFF151C36), onSurfaceVariant = Neon.Muted,
-    outline = Neon.Line, error = Neon.Red,
-)
+    /** Menerapkan pilihan Tampilan (dipanggil sebelum layar digambar). */
+    fun apply(d: com.natan.streambynatan.data.DisplayConfig) {
+        isLight = d.theme == "light"
+        textScale = if (d.largeText) 1.22f else 1f
+        if (isLight) {
+            Void = Color(0xFFF4F6FF); Deep = Color(0xFFFFFFFF)
+            Glass = Color(0x14000000); GlassStrong = Color(0x1F000000); Line = Color(0x33000000)
+            Cyan = Color(0xFF006C80); Violet = Color(0xFF5B2FD6); Pink = Color(0xFFC2185B)
+            Lime = Color(0xFF1B7F4B); Amber = Color(0xFF9A5B00); Red = Color(0xFFC62828)
+            Text = Color(0xFF0B1022); Muted = Color(0xFF3F4766)
+        } else {
+            Void = Color(0xFF070A14); Deep = Color(0xFF0B1022)
+            Glass = Color(0x1AFFFFFF); GlassStrong = Color(0x29FFFFFF); Line = Color(0x33FFFFFF)
+            Cyan = Color(0xFF22E5FF); Violet = Color(0xFF8B5CFF); Pink = Color(0xFFFF3DA8)
+            Lime = Color(0xFF7CFFB2); Amber = Color(0xFFFFC86B); Red = Color(0xFFFF4D6D)
+            Text = Color(0xFFF2F5FF); Muted = Color(0xFFA6B0CF)
+        }
+        if (d.highContrast) {
+            Muted = Text
+            Line = if (isLight) Color(0xFF000000) else Color(0xFFFFFFFF)
+            Glass = if (isLight) Color(0x22000000) else Color(0x33FFFFFF)
+            GlassStrong = if (isLight) Color(0x33000000) else Color(0x44FFFFFF)
+            if (!isLight) { Void = Color(0xFF000000); Deep = Color(0xFF000000) }
+        }
+    }
+}
 
 private val display = FontFamily.SansSerif
 
-private val type = Typography(
-    displaySmall = TextStyle(fontFamily = display, fontWeight = FontWeight.Black, fontSize = 34.sp, letterSpacing = (-0.5).sp),
-    headlineMedium = TextStyle(fontFamily = display, fontWeight = FontWeight.ExtraBold, fontSize = 26.sp),
-    headlineSmall = TextStyle(fontFamily = display, fontWeight = FontWeight.Bold, fontSize = 21.sp),
-    titleLarge = TextStyle(fontFamily = display, fontWeight = FontWeight.Bold, fontSize = 19.sp),
-    titleMedium = TextStyle(fontFamily = display, fontWeight = FontWeight.SemiBold, fontSize = 17.sp),
-    bodyLarge = TextStyle(fontFamily = display, fontSize = 17.sp, lineHeight = 24.sp),
-    bodyMedium = TextStyle(fontFamily = display, fontSize = 15.sp, lineHeight = 21.sp),
-    labelLarge = TextStyle(fontFamily = display, fontWeight = FontWeight.Bold, fontSize = 16.sp, letterSpacing = 0.4.sp),
-    labelMedium = TextStyle(fontFamily = display, fontWeight = FontWeight.SemiBold, fontSize = 13.sp, letterSpacing = 1.2.sp),
+private fun type(k: Float) = Typography(
+    displaySmall = TextStyle(fontFamily = display, fontWeight = FontWeight.Black, fontSize = (34 * k).sp, letterSpacing = (-0.5).sp),
+    headlineMedium = TextStyle(fontFamily = display, fontWeight = FontWeight.ExtraBold, fontSize = (26 * k).sp),
+    headlineSmall = TextStyle(fontFamily = display, fontWeight = FontWeight.Bold, fontSize = (21 * k).sp),
+    titleLarge = TextStyle(fontFamily = display, fontWeight = FontWeight.Bold, fontSize = (19 * k).sp),
+    titleMedium = TextStyle(fontFamily = display, fontWeight = FontWeight.SemiBold, fontSize = (17 * k).sp),
+    bodyLarge = TextStyle(fontFamily = display, fontSize = (17 * k).sp, lineHeight = 24.sp),
+    bodyMedium = TextStyle(fontFamily = display, fontSize = (15 * k).sp, lineHeight = 21.sp),
+    labelLarge = TextStyle(fontFamily = display, fontWeight = FontWeight.Bold, fontSize = (16 * k).sp, letterSpacing = 0.4.sp),
+    labelMedium = TextStyle(fontFamily = display, fontWeight = FontWeight.SemiBold, fontSize = (13 * k).sp, letterSpacing = 1.2.sp),
 )
 
 @Composable
 fun StreamTheme(content: @Composable () -> Unit) {
-    MaterialTheme(colorScheme = scheme, typography = type, content = content)
+    MaterialTheme(colorScheme = scheme(), typography = type(Neon.textScale), content = content)
 }
 
 /** Latar aurora bergerak pelan (dekorasi, diabaikan pembaca layar). */

@@ -65,9 +65,25 @@ class RecordingManager(private val context: Context, private val store: LocalSto
 
     fun momentsCount() = moments.size
 
+    /** Potongan per tamu: dari tamu naik ke siaran sampai tamu itu keluar (bisa bersamaan dengan momen pertanyaan). */
+    private val guestOpen = HashMap<String, Pair<String, Long>>()
+
+    @Synchronized fun beginGuest(id: String, name: String) {
+        if (recordStart == 0L || guestOpen.containsKey(id)) return
+        if (!com.natan.streambynatan.core.Graph.settings.current.features.guestClips) return
+        guestOpen[id] = "Tamu $name" to now()
+    }
+
+    @Synchronized fun endGuest(id: String) {
+        val (title, start) = guestOpen.remove(id) ?: return
+        val end = now()
+        if (end - start > 3000) moments += Moment(title, start, end, "guest")
+    }
+
     /** Dipanggil setelah live selesai: simpan rekaman utama, lalu potong otomatis. */
     fun finish(clipsEnabled: Boolean, onProgress: (String) -> Unit): Int {
         endMoment()
+        synchronized(this) { guestOpen.keys.toList().forEach { endGuest(it) } }
         val f = currentFile ?: return 0
         recordStart = 0L
         if (!f.exists() || f.length() < 10_000) return 0

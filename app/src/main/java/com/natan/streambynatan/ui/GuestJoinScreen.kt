@@ -143,7 +143,8 @@ fun GuestJoinScreen(activity: MainActivity, invite: GuestInvite, onClose: () -> 
                 }
                 GhostButton("Batal") { close() }
             }
-            GuestClient.Phase.WAITING, GuestClient.Phase.CONNECTING, GuestClient.Phase.ONSTAGE -> GlassCard {
+            GuestClient.Phase.WAITING, GuestClient.Phase.CONNECTING, GuestClient.Phase.ONSTAGE -> {
+            GlassCard {
                 if (!isCamera) Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     GhostButton(if (ui.micOn) "Matikan mikrofon" else "Nyalakan mikrofon", Modifier.weight(1f), if (ui.micOn) Icons.Filled.Mic else Icons.Filled.MicOff) {
                         gc.setMic(!ui.micOn)
@@ -160,6 +161,24 @@ fun GuestJoinScreen(activity: MainActivity, invite: GuestInvite, onClose: () -> 
                     }
                 }
                 NeonButton("Keluar dari live", brush = Neon.live, icon = Icons.Filled.CallEnd) { gc.leave() }
+            }
+            if (!isCamera) GlassCard {
+                SectionTitle("Filter")
+                Text("Filter terlihat di siaran host. Pratinjau di layarmu tetap tanpa filter.", color = Neon.Muted)
+                androidx.compose.foundation.lazy.LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    items(com.natan.streambynatan.features.Filters.presets.size) { i ->
+                        val p = com.natan.streambynatan.features.Filters.presets[i]
+                        FilterChipButton(p.label, ui.filter == p.id) { gc.setFilter(p.id) }
+                    }
+                }
+            }
+            if (!isCamera) GlassCard {
+                SectionTitle("Pesan untuk host")
+                ui.messages.takeLast(12).forEach { (from, text) -> Text("$from: $text", style = MaterialTheme.typography.bodyMedium) }
+                var msg by remember { mutableStateOf("") }
+                Field("Ketik pesan", msg) { msg = it.take(300) }
+                GhostButton("Kirim pesan") { gc.sendMessage(msg); msg = "" }
+            }
             }
             GuestClient.Phase.KICKED, GuestClient.Phase.LEFT, GuestClient.Phase.ERROR -> GlassCard {
                 NeonButton("Tutup") { close() }

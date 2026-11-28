@@ -44,6 +44,17 @@ class StageView(context: Context) : View(context) {
     @Volatile var subtitleScale: Float = 1f
     /** Bitmap tamu (WebRTC) yang ditampilkan sebagai kotak kecil. */
     val guestTiles = ConcurrentHashMap<String, Pair<String, Bitmap>>()
+    /** Teks layar bebas dari host (Sempurnakan > Teks layar). */
+    @Volatile var screenText: com.natan.streambynatan.data.ScreenTextConfig? = null
+    /** Papan nama: (nama, keterangan), posisi bottom_left | top_left | top_right. */
+    @Volatile var nameplate: Pair<String, String>? = null
+    @Volatile var nameplatePosition: String = "bottom_left"
+    /** Komentar yang ikut tampil di layar siaran: (nama, isi, waktu). */
+    val streamComments = java.util.concurrent.ConcurrentLinkedDeque<Triple<String, String, Long>>()
+    fun pushComment(name: String, text: String) {
+        streamComments.addLast(Triple(name, text.take(120), System.currentTimeMillis()))
+        while (streamComments.size > 4) streamComments.pollFirst()
+    }
     private var tickerX = Float.NaN
     private var zCounter = 0
     var onChange: ((List<String>) -> Unit)? = null
@@ -81,7 +92,10 @@ class StageView(context: Context) : View(context) {
 
         drawGuests(canvas, w, h)
         drawOverlayText(canvas, w, h)
+        drawScreenText(canvas, w, h)
+        drawComments(canvas, w, h)
         drawTicker(canvas, w, h)
+        drawNameplate(canvas, w, h)
         drawSubtitle(canvas, w, h)
 
         val sorted = entries.entries.sortedBy { it.value.z }
@@ -107,6 +121,67 @@ class StageView(context: Context) : View(context) {
         boxPaint.color = 0x99000000.toInt()
         c.drawRoundRect(RectF(w * 0.05f, top - 12, w * 0.95f, top + layout.height + 12), 24f, 24f, boxPaint)
         c.save(); c.translate(w * 0.07f, top); layout.draw(c); c.restore()
+    }
+
+    private val plateName = TextPaint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.WHITE; typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD) }
+    private val plateRole = TextPaint(Paint.ANTI_ALIAS_FLAG).apply { color = 0xFF22E5FF.toInt(); typeface = Typeface.DEFAULT }
+    private val commentName = TextPaint(Paint.ANTI_ALIAS_FLAG).apply { color = 0xFF22E5FF.toInt(); typeface = Typeface.DEFAULT_BOLD }
+    private val commentText = TextPaint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.WHITE }
+
+    private fun drawScreenText(c: Canvas, w: Int, h: Int) {
+        val st = screenText ?: return
+        if (!st.enabled || st.text.isBlank()) return
+        overlayPaint.color = st.color
+        overlayPaint.textSize = w * 0.05f * st.size.coerceIn(0.5f, 2.5f)
+        val layout = layout(st.text, overlayPaint, (w * 0.86f).toInt(), Layout.Alignment.ALIGN_CENTER, 4)
+        val top = when (st.position) { "center" -> (h - layout.height) / 2f; "bottom" -> h * 0.62f; else -> h * 0.13f }
+        if (st.background) {
+            boxPaint.color = 0x99000000.toInt()
+            c.drawRoundRect(RectF(w * 0.05f, top - 14, w * 0.95f, top + layout.height + 14), 26f, 26f, boxPaint)
+        }
+        c.save(); c.translate(w * 0.07f, top); layout.draw(c); c.restore()
+        overlayPaint.color = Color.WHITE
+    }
+
+    /** Komentar penonton di sisi kiri layar siaran (maksimal 4, hilang sendiri setelah 12 detik). */
+    private fun drawComments(c: Canvas, w: Int, h: Int) {
+        if (streamComments.isEmpty()) return
+        val now = System.currentTimeMillis()
+        streamComments.removeIf { now - it.third > 12_000 }
+        commentName.textSize = w * 0.03f; commentText.textSize = w * 0.032f
+        var y = h * 0.58f
+        for ((name, text, _) in streamComments) {
+            val l = layout(text, commentText, (w * 0.58f).toInt(), Layout.Alignment.ALIGN_NORMAL, 2)
+            val boxH = commentName.textSize * 1.3f + l.height + 16
+            boxPaint.color = 0x88000000.toInt()
+            c.drawRoundRect(RectF(w * 0.03f, y, w * 0.65f, y + boxH), 18f, 18f, boxPaint)
+            c.drawText(name, w * 0.05f, y + commentName.textSize * 1.15f, commentName)
+            c.save(); c.translate(w * 0.05f, y + commentName.textSize * 1.4f); l.draw(c); c.restore()
+            y += boxH + 10
+        }
+    }
+
+    /** Papan nama (misal "Natan · Host"), di kiri bawah DI ATAS teks berjalan, atau di posisi lain. */
+    private fun drawNameplate(c: Canvas, w: Int, h: Int) {
+        val (name, role) = nameplate ?: return
+        if (name.isBlank()) return
+        plateName.textSize = w * 0.048f; plateRole.textSize = w * 0.032f
+        val tw = maxOf(plateName.measureText(name), plateRole.measureText(role)) + w * 0.08f
+        val bh = plateName.textSize * 1.3f + (if (role.isNotBlank()) plateRole.textSize * 1.4f else 0f) + 20
+        val tickerReserve = if (tickerText.isNotBlank()) w * 0.04f * 1.8f + 10 else 0f
+        val subReserve = if (subtitle.isNotBlank()) h * 0.13f else h * 0.03f
+        val (left, top) = when (nameplatePosition) {
+            "top_left" -> w * 0.04f to h * 0.1f
+            "top_right" -> (w * 0.96f - tw) to h * 0.1f
+            else -> w * 0.04f to (h - subReserve - tickerReserve - bh - 16)
+        }
+        boxPaint.shader = LinearGradient(left, 0f, left + tw, 0f, 0xE622E5FF.toInt(), 0xE68B5CFF.toInt(), Shader.TileMode.CLAMP)
+        c.drawRect(left, top, left + 10, top + bh, boxPaint)
+        boxPaint.shader = null
+        boxPaint.color = 0xCC070A14.toInt()
+        c.drawRect(left + 10, top, left + tw, top + bh, boxPaint)
+        c.drawText(name, left + w * 0.04f, top + plateName.textSize * 1.15f, plateName)
+        if (role.isNotBlank()) c.drawText(role, left + w * 0.04f, top + plateName.textSize * 1.3f + plateRole.textSize * 1.15f, plateRole)
     }
 
     /** Teks berjalan, diletakkan sedikit DI ATAS subtitle supaya tidak bertumpuk. */

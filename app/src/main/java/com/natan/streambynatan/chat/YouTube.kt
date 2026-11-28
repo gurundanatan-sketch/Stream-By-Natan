@@ -90,6 +90,15 @@ class YouTubeApi(private val context: Context, private val http: OkHttpClient) {
             }
         }
 
+    /** Mengirim pesan ke live chat YouTube dari akun yang terhubung (balas komentar pakai suara). */
+    suspend fun sendChat(chatId: String, text: String) {
+        val body = JSONObject().put("snippet", JSONObject()
+            .put("liveChatId", chatId)
+            .put("type", "textMessageEvent")
+            .put("textMessageDetails", JSONObject().put("messageText", text.take(200))))
+        call("POST", "$base/liveChat/messages?part=snippet", body)
+    }
+
     private fun iso(ms: Long): String = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'", Locale.US)
         .apply { timeZone = TimeZone.getTimeZone("UTC") }.format(Date(ms))
 
@@ -177,6 +186,8 @@ class YouTubeApi(private val context: Context, private val http: OkHttpClient) {
 class YouTubeChatClient(private val api: YouTubeApi) {
     private val scope = CoroutineScope(Dispatchers.IO)
     private var job: Job? = null
+    /** ID live chat yang sedang aktif (untuk membalas komentar). */
+    @Volatile var chatId: String? = null; private set
 
     fun start(videoId: String, apiKey: String) {
         stop()
@@ -189,6 +200,7 @@ class YouTubeChatClient(private val api: YouTubeApi) {
                 delay(15_000)
             }
             val (chatId, vid) = found ?: run { LiveBus.stats { it.copy(youtubeChat = "Siaran aktif tidak ditemukan") }; return@launch }
+            this@YouTubeChatClient.chatId = chatId
             LiveBus.stats { it.copy(youtubeChat = "Tersambung") }
             launch { pollStats(vid, apiKey) }
             launch { pollSubscribers() }

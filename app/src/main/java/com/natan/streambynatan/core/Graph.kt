@@ -37,6 +37,8 @@ object Graph {
     val ytApi by lazy { YouTubeApi(app, http) }
     val ytChat by lazy { YouTubeChatClient(ytApi) }
     val guests by lazy { GuestManager(app) }
+    val euler by lazy { com.natan.streambynatan.chat.EulerClient(http) }
+    val social by lazy { Social(app) }
     val guestClient by lazy { com.natan.streambynatan.guest.GuestClient(app) }
     val recordings by lazy { RecordingManager(app, local) }
     val firebase by lazy { FirebaseSync(app) }
@@ -63,6 +65,7 @@ class App : Application() {
         if (proc.endsWith(":crash")) return
         Graph.init(this)
         Graph.firebase.init()
+        if (Graph.firebase.uid != null) Graph.social.onSignedIn()
     }
 }
 

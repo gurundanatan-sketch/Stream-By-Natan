@@ -38,6 +38,13 @@ class MainActivity : ComponentActivity() {
     val message = mutableStateOf<String?>(null)
     /** Undangan tamu yang sedang dibuka (dari link atau kode). */
     val guestInvite = mutableStateOf<GuestInvite?>(null)
+    /** Undangan moderator dari link: (uid host, kode). */
+    val modInvite = mutableStateOf<Pair<String, String>?>(null)
+    /** Username dari link profil (/@username atau streambynatan://profile?u=…). */
+    val profileLink = mutableStateOf<String?>(null)
+    /** Beralih akun: email yang diisi otomatis di layar masuk / langsung pilih akun Google. */
+    val pendingLoginEmail = mutableStateOf("")
+    val pendingGoogleLogin = mutableStateOf(false)
 
     private var pendingMode = LiveMode.CAMERA
     private var pendingPractice = false
@@ -85,6 +92,8 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        com.natan.streambynatan.ui.theme.Neon.apply(Graph.settings.current.display)
+        com.natan.streambynatan.features.I18n.apply(this, Graph.settings.current.language)
         if (Graph.settings.current.features.keepScreenOn) window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         handleInvite(intent)
         if (guestInvite.value == null) askBasicPermissions()
@@ -103,12 +112,34 @@ class MainActivity : ComponentActivity() {
 
     private fun handleInvite(i: Intent?) {
         val uri = i?.data ?: return
+        if (uri.scheme == "streambynatan" && uri.host == "profile") {
+            uri.getQueryParameter("u")?.takeIf { it.isNotBlank() }?.let { profileLink.value = it }
+            return
+        }
+        if (uri.path.orEmpty().startsWith("/@")) {
+            profileLink.value = uri.path!!.removePrefix("/@").trim('/')
+            return
+        }
+        if (uri.path.orEmpty().startsWith("/mod") || (uri.scheme == "streambynatan" && uri.host == "mod")) {
+            val h = uri.getQueryParameter("h").orEmpty(); val c = uri.getQueryParameter("c").orEmpty()
+            if (h.isNotBlank() && c.isNotBlank()) modInvite.value = h to c
+            return
+        }
         parseInvite(uri.toString())?.let { guestInvite.value = it }
     }
 
     fun basicPermissionsGranted(): Boolean =
         listOf(Manifest.permission.CAMERA, Manifest.permission.RECORD_AUDIO)
             .all { ContextCompat.checkSelfPermission(this, it) == PackageManager.PERMISSION_GRANTED }
+
+    /** Izin foto & video serta musik & audio (untuk latar, overlay, tema, dan musik dari galeri). */
+    fun mediaPermissions(): List<String> =
+        if (Build.VERSION.SDK_INT >= 33) listOf(Manifest.permission.READ_MEDIA_IMAGES, Manifest.permission.READ_MEDIA_VIDEO, Manifest.permission.READ_MEDIA_AUDIO)
+        else listOf(Manifest.permission.READ_EXTERNAL_STORAGE)
+
+    fun mediaPermissionsGranted(): Boolean = mediaPermissions().all { ContextCompat.checkSelfPermission(this, it) == PackageManager.PERMISSION_GRANTED }
+
+    fun askMediaPermissions() { permissions.launch(mediaPermissions().toTypedArray()) }
 
     fun askBasicPermissions() {
         val list = mutableListOf(Manifest.permission.CAMERA, Manifest.permission.RECORD_AUDIO)

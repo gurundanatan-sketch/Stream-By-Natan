@@ -54,7 +54,16 @@ class GuestManager(private val context: Context) {
         @Volatile var sharingScreen: Boolean = false,
         @Volatile var level: Float = 0f,
         @Volatile var lastSpokeAt: Long = 0L,
-    )
+        /** Filter pilihan tamu (lihat Filters.presets). */
+        @Volatile var filter: String = "normal",
+        /** "app" = lewat aplikasi, "web" = lewat browser. */
+        @Volatile var via: String = "web",
+    ) {
+        val viaLabel: String get() = if (via == "app") "lewat aplikasi" else "lewat browser"
+    }
+
+    /** Perintah dari moderator (bisukan penonton, atur antrean pertanyaan, dll). Dijalankan oleh LiveBrain. */
+    var onCommand: ((type: String, data: Map<String, Any?>) -> Unit)? = null
 
     val remotes = ConcurrentHashMap<String, Remote>()
     private val _waiting = MutableStateFlow<List<Remote>>(emptyList())
@@ -92,7 +101,23 @@ class GuestManager(private val context: Context) {
         if (started) return true
         if (factory == null) init()
         roomId = roomId.ifBlank { UUID.randomUUID().toString().take(8) }
-        store.collection("rooms").document(roomId).set(mapOf("createdAt" to System.currentTimeMillis(), "open" to true))
+        val me = com.natan.streambynatan.core.Graph.firebase
+        store.collection("rooms").document(roomId).set(mapOf(
+            "createdAt" to System.currentTimeMillis(), "open" to true,
+            "hostUid" to (me.uid ?: ""), "hostName" to (me.displayName ?: "Host"),
+        ))
+        com.natan.streambynatan.core.Graph.social.publishRoom(roomId)
+        // perintah moderator
+        registrations += store.collection("rooms").document(roomId).collection("commands")
+            .addSnapshotListener { snap, _ ->
+                snap?.documentChanges?.filter { it.type == DocumentChange.Type.ADDED }?.forEach { ch ->
+                    val d = ch.document
+                    if (d.getBoolean("done") == true) return@forEach
+                    val type = d.getString("type") ?: return@forEach
+                    main.post { onCommand?.invoke(type, d.data) }
+                    d.reference.update("done", true)
+                }
+            }
         registrations += store.collection("rooms").document(roomId).collection("peers")
             .addSnapshotListener { snap, _ ->
                 snap?.documentChanges?.forEach { ch ->
@@ -102,8 +127,16 @@ class GuestManager(private val context: Context) {
                     if (status == "left" || status == "kicked") { drop(d.id, notify = false); return@forEach }
                     val r = remotes.getOrPut(d.id) {
                         Remote(d.id, uniqueName(GuestClient.cleanName(d.getString("name").orEmpty()).ifBlank { "Tamu" }), d.getString("mode") ?: "guest", d.getLong("joinedAt") ?: System.currentTimeMillis())
-                            .also { if (it.mode == "guest") LiveBus.announce("${it.name} masuk ruang tunggu") }
+                            .also {
+                                if (it.mode == "guest") {
+                                    LiveBus.announce("${it.name} masuk ruang tunggu, ${if (d.getString("app") == "web") "lewat browser" else "lewat aplikasi"}")
+                                    onWaiting?.invoke(it)
+                                }
+                                listenMessages(d.id)
+                            }
                     }
+                    r.filter = d.getString("filter") ?: "normal"
+                    r.via = if (d.getString("app") == "web") "web" else "app"
                     r.micOn = d.getBoolean("micOn") ?: true
                     r.sharingScreen = d.getBoolean("screen") ?: false
                     if (r.status == "waiting" && status == "admitted") r.status = "admitted"
@@ -128,6 +161,46 @@ class GuestManager(private val context: Context) {
         var i = 2
         while ("$name $i".lowercase() in taken) i++
         return "$name $i"
+    }
+
+    var onWaiting: ((Remote) -> Unit)? = null
+    var onGuestMessage: ((Remote?, String) -> Unit)? = null
+    private val messageListeners = ConcurrentHashMap<String, ListenerRegistration>()
+
+    /** Pesan dari tamu di ruang tunggu (atau saat tampil). Disaring kata kasar sebelum ditampilkan. */
+    private fun listenMessages(peerId: String) {
+        val col = peersCol()?.document(peerId)?.collection("messages") ?: return
+        val startAt = System.currentTimeMillis() - 5_000
+        messageListeners[peerId] = col.addSnapshotListener { snap, _ ->
+            snap?.documentChanges?.filter { it.type == DocumentChange.Type.ADDED }?.forEach { ch ->
+                val d = ch.document
+                if (d.getString("from") != "guest") return@forEach
+                if ((d.getLong("at") ?: 0L) < startAt) return@forEach
+                val raw = d.getString("text").orEmpty().take(300)
+                val s = com.natan.streambynatan.core.Graph.settings.current
+                val text = com.natan.streambynatan.features.TextTools.censor(raw, s.profanity).first
+                val r = remotes[peerId]
+                LiveBus.guestMessage(peerId, r?.name ?: "Tamu", text)
+                LiveBus.feed("✉️ ${r?.name ?: "Tamu"}: $text")
+                main.post { onGuestMessage?.invoke(r, text) }
+            }
+        }
+    }
+
+    /** Balasan host / moderator untuk tamu. */
+    fun reply(peerId: String, text: String, from: String = "host") {
+        if (text.isBlank()) return
+        peersCol()?.document(peerId)?.collection("messages")?.add(mapOf(
+            "from" to from, "name" to (com.natan.streambynatan.core.Graph.firebase.displayName ?: "Host"),
+            "text" to text.take(300), "at" to System.currentTimeMillis(),
+        ))
+        LiveBus.guestMessage(peerId, "Kamu → ${remotes[peerId]?.name ?: "tamu"}", text)
+    }
+
+    /** Status ruang untuk moderator (antrean pertanyaan, penonton terakhir). */
+    fun publishRoomState(data: Map<String, Any?>) {
+        if (!started || roomId.isBlank()) return
+        db?.collection("rooms")?.document(roomId)?.update(data)
     }
 
     private fun publish() {
@@ -204,7 +277,12 @@ class GuestManager(private val context: Context) {
             override fun onConnectionChange(newState: PeerConnection.PeerConnectionState) {
                 LiveBus.feed("${remote.name}: ${newState.name.lowercase()}")
                 when (newState) {
-                    PeerConnection.PeerConnectionState.CONNECTED -> { remote.status = "onstage"; main.post { publish() } }
+                    PeerConnection.PeerConnectionState.CONNECTED -> {
+                        remote.status = "onstage"
+                        if (remote.mode == "guest" && com.natan.streambynatan.core.Graph.settings.current.features.guestClips)
+                            com.natan.streambynatan.core.Graph.recordings.beginGuest(remote.id, remote.name)
+                        main.post { publish() }
+                    }
                     PeerConnection.PeerConnectionState.FAILED, PeerConnection.PeerConnectionState.CLOSED -> main.post { drop(peerId) }
                     else -> Unit
                 }
@@ -264,6 +342,8 @@ class GuestManager(private val context: Context) {
     }
 
     fun drop(peerId: String, notify: Boolean = true) {
+        com.natan.streambynatan.core.Graph.recordings.endGuest(peerId)
+        messageListeners.remove(peerId)?.remove()
         peers.remove(peerId)?.let { runCatching { it.close() } }
         remotes.remove(peerId)
         if (notify) publish() else main.post { publish() }
@@ -276,7 +356,10 @@ class GuestManager(private val context: Context) {
         peers.keys.toList().forEach { drop(it) }
         remotes.clear()
         publish()
+        messageListeners.values.forEach { it.remove() }
+        messageListeners.clear()
         if (roomId.isNotBlank()) db?.collection("rooms")?.document(roomId)?.update("open", false)
+        com.natan.streambynatan.core.Graph.social.publishRoom("")
     }
 
     /** Mengambil gambar dari video tamu (sekitar 12 fps) untuk ditempel ke siaran. */
@@ -310,6 +393,12 @@ class GuestManager(private val context: Context) {
                     var bmp = Bitmap.createBitmap(px, w, h, Bitmap.Config.ARGB_8888)
                     if (frame.rotation != 0) {
                         bmp = Bitmap.createBitmap(bmp, 0, 0, w, h, Matrix().apply { postRotate(frame.rotation.toFloat()) }, true)
+                    }
+                    // filter pilihan tamu diterapkan di sini, jadi berlaku di semua tata letak siaran
+                    com.natan.streambynatan.features.Filters.colorFilter(remote.filter)?.let { cf ->
+                        val out = Bitmap.createBitmap(bmp.width, bmp.height, Bitmap.Config.ARGB_8888)
+                        android.graphics.Canvas(out).drawBitmap(bmp, 0f, 0f, android.graphics.Paint().apply { colorFilter = cf })
+                        bmp = out
                     }
                     remote.frame = bmp
                     onFrame?.invoke(remote)

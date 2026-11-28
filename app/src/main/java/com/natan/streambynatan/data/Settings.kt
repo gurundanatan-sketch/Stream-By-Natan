@@ -61,6 +61,139 @@ data class AppSettings(
     val pollDurationSec: Int = 60,
     val silenceToHideVerseMs: Int = 2500,
     val updateCheckOnStart: Boolean = true,
+    // ---------------- tambahan versi 2
+    val onboardingDone: Boolean = false,
+    val a11y: A11yConfig = A11yConfig(),
+    val language: String = "id",
+    val display: DisplayConfig = DisplayConfig(),
+    /** Platform tambahan selain YouTube & TikTok (Facebook, server RTMP lain). Stream key disimpan terenkripsi. */
+    val extraPlatforms: List<PlatformTarget> = Defaults.extraPlatforms,
+    /** Kualitas video: 480 | 720 | 1080 | auto */
+    val quality: String = "720",
+    val filter: FilterConfig = FilterConfig(),
+    val screenText: ScreenTextConfig = ScreenTextConfig(),
+    val nameplate: NameplateConfig = NameplateConfig(),
+    val commentDisplay: CommentDisplayConfig = CommentDisplayConfig(),
+    val cues: Map<String, CueConfig> = Defaults.cues,
+    val giveaway: GiveawayConfig = GiveawayConfig(),
+    val quiz: List<QuizItem> = emptyList(),
+    val songRequestKeyword: String = "!lagu",
+    val quietWarnMinutes: Int = 3,
+    val drinkReminderMinutes: Int = 45,
+    val batteryWarnPercent: Int = 20,
+    val temperatureWarnC: Int = 42,
+    val rundown: List<RundownItem> = emptyList(),
+    val themes: List<ThemeImage> = emptyList(),
+    val themeTrigger: String = "tema",
+    val themeDurationSec: Int = 12,
+    val pause: PauseConfig = PauseConfig(),
+    val overlays: List<OverlayMedia> = emptyList(),
+    val voiceReplyTrigger: String = "balas",
+)
+
+@Serializable
+data class A11yConfig(
+    /** true = semua bantuan suara aktif (bisikan catatan, pengumuman). false = tampil sebagai teks di layar. */
+    val voiceAids: Boolean = false,
+    val chosen: Boolean = false,
+)
+
+@Serializable
+data class DisplayConfig(
+    val theme: String = "dark", // dark | light
+    val largeText: Boolean = false,
+    val highContrast: Boolean = false,
+)
+
+@Serializable
+data class PlatformTarget(
+    val id: String,
+    val name: String,
+    val server: String,
+    val enabled: Boolean = false,
+)
+
+@Serializable
+data class FilterConfig(
+    /** Filter siaran host (lihat Filters.presets). */
+    val preset: String = "normal",
+    val brightness: Float = 1f,
+    val contrast: Float = 1f,
+    val saturation: Float = 1f,
+    val smoothSkin: Boolean = false,
+)
+
+@Serializable
+data class ScreenTextConfig(
+    val enabled: Boolean = false,
+    val text: String = "",
+    val position: String = "top", // top | center | bottom
+    val size: Float = 1f,
+    val color: Int = 0xFFFFFFFF.toInt(),
+    val background: Boolean = true,
+)
+
+@Serializable
+data class NameplateConfig(
+    val enabled: Boolean = false,
+    val name: String = "",
+    val role: String = "Host",
+    val position: String = "bottom_left", // bottom_left | top_left | top_right
+    /** 0 = tampil terus, selain itu tampil N detik di awal live lalu hilang. */
+    val showSeconds: Int = 0,
+    val guestPlates: Boolean = true,
+)
+
+@Serializable
+data class CommentDisplayConfig(
+    /** Komentar ikut tampil di layar siaran. */
+    val onStream: Boolean = false,
+    /** Ukuran tulisan komentar di layar host. */
+    val hostTextScale: Float = 1f,
+    /** Letak kolom komentar di layar host: bottom | top */
+    val hostPosition: String = "bottom",
+)
+
+@Serializable
+data class CueConfig(
+    val vibrate: Boolean = true,
+    /** Pola getar: short | double | long | triple */
+    val pattern: String = "short",
+    val sound: String = "",
+    val speak: Boolean = false,
+)
+
+@Serializable
+data class GiveawayConfig(
+    val keyword: String = "!ikut",
+    val durationSec: Int = 120,
+    val prize: String = "",
+)
+
+@Serializable
+data class QuizItem(val question: String, val answer: String)
+
+@Serializable
+data class RundownItem(val title: String, val minutes: Int)
+
+@Serializable
+data class ThemeImage(val id: String, val title: String, val imagePath: String)
+
+@Serializable
+data class PauseConfig(
+    val text: String = "Sebentar ya, live akan segera kembali",
+    val imagePath: String = "",
+    val muteMic: Boolean = true,
+)
+
+@Serializable
+data class OverlayMedia(
+    val id: String,
+    val name: String,
+    val uri: String,
+    val type: String = "image", // image | video
+    val size: String = "medium", // small | medium | full
+    val position: String = "top_right",
 )
 
 @Serializable
@@ -124,6 +257,24 @@ data class FeatureToggles(
     val music: Boolean = false,
     val guests: Boolean = false,
     val progressStats: Boolean = true,
+    // ---------------- tambahan versi 2 (semua opsional)
+    val giveaway: Boolean = false,
+    val quiz: Boolean = false,
+    val songRequests: Boolean = false,
+    val quietWarning: Boolean = false,
+    val drinkReminder: Boolean = false,
+    val batteryWarning: Boolean = true,
+    val voiceReply: Boolean = false,
+    val pauseButton: Boolean = true,
+    val rundown: Boolean = false,
+    val practiceReport: Boolean = false,
+    val themes: Boolean = false,
+    val nameplate: Boolean = false,
+    val cues: Boolean = true,
+    val touchLock: Boolean = true,
+    /** Suara musik latar mengecil otomatis saat host berbicara. */
+    val musicDucking: Boolean = false,
+    val guestClips: Boolean = true,
 )
 
 @Serializable
@@ -290,6 +441,8 @@ data class MicFx(
     val volumeBalancer: Boolean = true,
     val micVolume: Float = 1.0f,
     val internalVolume: Float = 1.0f,
+    /** Pengubah suara: none | robot | high | deep | chipmunk | giant | echo | phone */
+    val voiceChanger: String = "none",
 )
 
 @Serializable
@@ -298,6 +451,9 @@ data class MusicConfig(
     val customPath: String = "",
     val volume: Float = 0.25f,
     val loop: Boolean = true,
+    /** Tingkat musik saat host berbicara (0..1 dari volume normal). Musik mengecil, tidak hilang. */
+    val duckLevel: Float = 0.35f,
+    val customName: String = "",
 )
 
 @Serializable

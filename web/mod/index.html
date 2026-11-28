@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Undangan moderator · Stream By Natan</title>
+<link rel="stylesheet" href="/style.css">
+</head>
+<body>
+<main>
+  <p class="eyebrow">STREAM BY NATAN</p>
+  <h1>Kamu diundang jadi moderator</h1>
+  <p>Moderator bisa membantu host: memasukkan, membisukan, atau mengeluarkan tamu, mengirim pengumuman, dan melihat antrean pertanyaan.</p>
+  <section class="card">
+    <a class="btn primary" id="openApp">Buka di aplikasi</a>
+    <a class="btn" href="/download/">Belum punya aplikasinya? Unduh</a>
+  </section>
+  <section class="card small">
+    <h2>Caranya</h2>
+    <ol>
+      <li>Pasang aplikasi Stream By Natan, lalu masuk dengan akunmu.</li>
+      <li>Buka lagi link undangan ini, atau tekan "Buka di aplikasi".</li>
+      <li>Tekan Terima. Host akan muncul di menu Akun, bagian Saya moderator.</li>
+    </ol>
+  </section>
+</main>
+<script>
+  const q = new URLSearchParams(location.search);
+  const h = (q.get('h') || '').replace(/[^A-Za-z0-9]/g, ''), c = (q.get('c') || '').replace(/[^A-Za-z0-9-]/g, '');
+  document.getElementById('openApp').href = 'streambynatan://mod?h=' + h + '&c=' + c;
+</script>
+</body>
+</html>

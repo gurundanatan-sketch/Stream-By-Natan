@@ -23,6 +23,7 @@ import com.natan.streambynatan.features.LiveBrain
 import com.natan.streambynatan.overlay.CinematicItem
 import com.natan.streambynatan.overlay.StageHost
 import com.pedro.common.ConnectChecker
+import com.pedro.encoder.input.gl.render.filters.BaseFilterRender
 import com.pedro.encoder.input.gl.render.filters.BrightnessFilterRender
 import com.pedro.encoder.input.gl.render.filters.`object`.ViewSurfaceFilterRender
 import com.pedro.encoder.input.sources.audio.AudioSource
@@ -72,6 +73,8 @@ class LiveEngine(private val context: Context, private val owner: LifecycleOwner
     private val compositor = com.natan.streambynatan.guest.StageCompositor()
     private var ytIndex = -1
     private var ttIndex = -1
+    /** Platform tambahan: id -> indeks klien RTMP. */
+    private val extraIndex = LinkedHashMap<String, Int>()
     private var stopping = false
     private var activeCameraName = "depan"
     private var networkCallback: ConnectivityManager.NetworkCallback? = null
@@ -79,26 +82,33 @@ class LiveEngine(private val context: Context, private val owner: LifecycleOwner
 
     private val bitrateAdapter = BitrateAdapter { br -> runCatching { stream.setVideoBitrateOnFly(br) } }
 
-    private inner class Checker(val label: String, val isYt: Boolean) : ConnectChecker {
-        private fun state(s: String) = LiveBus.stats { if (isYt) it.copy(youtubeState = s) else it.copy(tiktokState = s) }
+    private inner class Checker(val label: String, val isYt: Boolean, val extraId: String = "") : ConnectChecker {
+        private fun state(s: String) = LiveBus.stats {
+            when {
+                extraId.isNotBlank() -> it.copy(extraStates = it.extraStates + (extraId to s))
+                isYt -> it.copy(youtubeState = s)
+                else -> it.copy(tiktokState = s)
+            }
+        }
+        private fun index() = if (extraId.isNotBlank()) extraIndex[extraId] ?: -1 else if (isYt) ytIndex else ttIndex
         override fun onConnectionStarted(url: String) = state("Menyambung…")
         override fun onConnectionSuccess() { state("Live"); LiveBus.announce("$label tersambung, kamu sudah live") }
         override fun onConnectionFailed(reason: String) {
-            val idx = if (isYt) ytIndex else ttIndex
+            val idx = index()
             val client = runCatching { stream.getStreamClient(MultiType.RTMP, idx) }.getOrNull()
             if (!stopping && settings.video.autoReconnect && client?.reTry(5000, reason) == true) {
                 state("Menyambung ulang…")
                 g.tts.whisper("Koneksi $label bermasalah, menyambung ulang.")
             } else {
                 state("Gagal: $reason")
-                if (!stopping) g.tts.whisper("$label gagal tersambung.")
+                if (!stopping) { g.tts.whisper("$label gagal tersambung."); if (this@LiveEngine::brain.isInitialized) brain.extras.cue("connection_lost", "$label terputus") }
                 main.post { runCatching { stream.stopStream(MultiType.RTMP, idx) } }
             }
         }
         override fun onNewBitrate(bitrate: Long) {
             LiveBus.stats { it.copy(bitrateKbps = bitrate / 1000) }
-            if (settings.video.adaptiveBitrate) {
-                val idx = if (isYt) ytIndex else ttIndex
+            if (settings.video.adaptiveBitrate || settings.quality == "auto") {
+                val idx = index()
                 val congested = runCatching { stream.getStreamClient(MultiType.RTMP, idx).hasCongestion(20f) }.getOrDefault(false)
                 bitrateAdapter.adaptBitrate(bitrate, congested)
             }
@@ -110,6 +120,7 @@ class LiveEngine(private val context: Context, private val owner: LifecycleOwner
 
     private val ytChecker = Checker("YouTube", true)
     private val ttChecker = Checker("TikTok", false)
+    private val extraCheckers = settings.extraPlatforms.map { Checker(it.name, false, it.id) }
 
     /** Menyiapkan semua sumber & encoder. [proj] wajib untuk mode layar / audio internal. */
     fun prepare(mode: LiveMode, practice: Boolean, proj: MediaProjection?) {
@@ -125,25 +136,32 @@ class LiveEngine(private val context: Context, private val owner: LifecycleOwner
         // Mikrofon + audio internal (Android 10+) kalau ada izin rekam layar, selain itu mikrofon saja.
         val audio: AudioSource = if (proj != null && Build.VERSION.SDK_INT >= 29) MixAudioSource(proj) else MicrophoneSource()
         audioSource = audio
-        stream = MultiStream(context, arrayOf<ConnectChecker>(ytChecker, ttChecker), null, null, null, video, audio)
+        // YouTube, TikTok, lalu platform tambahan (Facebook, Instagram, server lain) dari satu encoder
+        val checkers = arrayOf<ConnectChecker>(ytChecker, ttChecker) + extraCheckers
+        stream = MultiStream(context, checkers, null, null, null, video, audio)
         ytIndex = 0; ttIndex = 1
-        for (i in 0..1) runCatching {
+        extraIndex.clear()
+        s.extraPlatforms.forEachIndexed { i, p -> extraIndex[p.id] = 2 + i }
+        for (i in checkers.indices) runCatching {
             stream.getStreamClient(MultiType.RTMP, i).setReTries(10)
         }
 
-        val v = s.video
+        val v = qualityConfig(s)
         val long = maxOf(v.width, v.height); val short = minOf(v.width, v.height)
         val rotation = if (v.portrait) 90 else 0
         val okV = stream.prepareVideo(long, short, v.bitrateKbps * 1000, v.fps, 2, rotation)
         val okA = stream.prepareAudio(44100, true, v.audioBitrateKbps * 1000, echoCanceler = false, noiseSuppressor = s.micFx.noiseSuppressor)
         if (!okV || !okA) throw IllegalStateException("HP ini tidak mendukung pengaturan video/audio tersebut. Coba turunkan resolusi.")
         bitrateAdapter.setMaxBitrate(v.bitrateKbps * 1000)
+        currentBitrate = v.bitrateKbps
 
         // Pencampur audio untuk TTS/efek/musik ke siaran
         val fx = StudioAudioEffect(g.mixer, 44100, 2).also {
             it.fx = s.micFx
             it.speechTap = { pcm -> g.speech.feed(pcm) }
             it.levelListener = { lvl -> compositor.hostLevel = lvl; levelForUi?.invoke(lvl) }
+            it.ducking = s.features.musicDucking
+            it.duckLevel = s.music.duckLevel
         }
         effect = fx
         when (audio) {
@@ -156,13 +174,13 @@ class LiveEngine(private val context: Context, private val owner: LifecycleOwner
         // Lapisan grafis siaran
         stageFilter.setScale(100f, 100f)
         stageFilter.setPosition(0f, 0f)
-        stream.getGlInterface().addFilter(stageFilter)
         stageHost.layoutParams = ViewGroup.LayoutParams(short, long)
         stageFilter.setView(stageHost)
         if (s.features.autoLight) {
-            brightness = BrightnessFilterRender().also { stream.getGlInterface().addFilter(it) }
+            brightness = BrightnessFilterRender()
             assistant.onBrightness = { lum -> brightness?.setBrightness((1f + (0.45f - lum) * 1.2f).coerceIn(0.7f, 1.6f)) }
         }
+        applyFilters()
         brain = LiveBrain(context, this, stageHost)
     }
 
@@ -181,6 +199,12 @@ class LiveEngine(private val context: Context, private val owner: LifecycleOwner
             }.onFailure { LiveBus.feed("Rekaman gagal dimulai: ${it.message}") }
         }
         if (!practice) {
+            s.extraPlatforms.filter { it.enabled }.forEach { p ->
+                val key = g.secure.get("key_${p.id}")
+                val idx = extraIndex[p.id] ?: return@forEach
+                if (p.server.isNotBlank() && key.isNotBlank()) runCatching { stream.startStream(MultiType.RTMP, idx, join(p.server, key)) }
+                else LiveBus.stats { it.copy(extraStates = it.extraStates + (p.id to "Server/key kosong")) }
+            }
             val ytKey = g.secure.get(SecureStore.YOUTUBE_KEY)
             val ttKey = g.secure.get(SecureStore.TIKTOK_KEY)
             if (s.enableYouTube && ytKey.isNotBlank()) stream.startStream(MultiType.RTMP, ytIndex, join(s.youtubeServer, ytKey))
@@ -242,6 +266,8 @@ class LiveEngine(private val context: Context, private val owner: LifecycleOwner
         bgReplacer?.stop()
         runCatching { stream.stopStream(MultiType.RTMP, ytIndex) }
         runCatching { stream.stopStream(MultiType.RTMP, ttIndex) }
+        extraIndex.values.forEach { i -> runCatching { stream.stopStream(MultiType.RTMP, i) } }
+        runCatching { if (stream.isOnPreview) stream.stopPreview() }
         val wasRecording = stream.isRecording
         runCatching { if (wasRecording) stream.stopRecord() }
         runCatching { stream.release() }
@@ -282,7 +308,87 @@ class LiveEngine(private val context: Context, private val owner: LifecycleOwner
         LiveBus.stats { it.copy(shareAudioOn = on && audioSource is MixAudioSource) }
     }
 
-    fun updateMicFx() { effect?.fx = settings.micFx }
+    fun updateMicFx() {
+        effect?.fx = settings.micFx
+        effect?.ducking = settings.features.musicDucking
+        effect?.duckLevel = settings.music.duckLevel
+    }
+
+    // ---------------------------------------------------------------- kualitas & filter
+    private var currentBitrate = 2500
+
+    /** Kualitas video pilihan: 480p, 720p, 1080p, atau otomatis (turun sendiri saat internet lemah). */
+    private fun qualityConfig(s: AppSettings): com.natan.streambynatan.data.VideoConfig {
+        val v = s.video
+        return when (s.quality) {
+            "480" -> v.copy(width = 480, height = 854, bitrateKbps = 1200)
+            "1080" -> v.copy(width = 1080, height = 1920, bitrateKbps = 4500)
+            "auto" -> v.copy(width = 720, height = 1280, bitrateKbps = 2500, adaptiveBitrate = true)
+            "720" -> v.copy(width = 720, height = 1280, bitrateKbps = 2500)
+            else -> v
+        }
+    }
+
+    /**
+     * Menyusun ulang filter siaran: filter warna + penyesuaian dasar + kulit halus di bawah,
+     * lapisan grafis (teks, kartu, overlay) paling atas supaya tidak ikut terwarnai.
+     */
+    fun applyFilters() {
+        if (!this::stream.isInitialized) return
+        val gl = stream.getGlInterface()
+        val f = settings.filter
+        runCatching { gl.clearFilters() }
+        val list = ArrayList<BaseFilterRender>()
+        com.natan.streambynatan.features.Filters.byId(f.preset).gpu.forEach { name ->
+            (com.natan.streambynatan.features.Filters.gpu(name) as? BaseFilterRender)?.let { flt ->
+                when (name) {
+                    "BrightnessFilterRender" -> com.natan.streambynatan.features.Filters.setFloat(flt, "setBrightness", 1.15f)
+                    "TemperatureFilterRender" -> com.natan.streambynatan.features.Filters.setFloat(flt, "setTemperature", if (f.preset == "sejuk") 0.35f else 0.75f)
+                    "ContrastFilterRender" -> com.natan.streambynatan.features.Filters.setFloat(flt, "setContrast", if (f.preset == "dramatis") 1.4f else 1.2f)
+                    "SaturationFilterRender" -> com.natan.streambynatan.features.Filters.setFloat(flt, "setSaturation", if (f.preset == "sinematik") 0.8f else 1.5f)
+                }
+                list += flt
+            }
+        }
+        if (f.brightness != 1f) BrightnessFilterRender().also { it.setBrightness(f.brightness); list += it }
+        if (f.contrast != 1f) (com.natan.streambynatan.features.Filters.gpu("ContrastFilterRender") as? BaseFilterRender)?.let {
+            com.natan.streambynatan.features.Filters.setFloat(it, "setContrast", f.contrast); list += it
+        }
+        if (f.saturation != 1f) (com.natan.streambynatan.features.Filters.gpu("SaturationFilterRender") as? BaseFilterRender)?.let {
+            com.natan.streambynatan.features.Filters.setFloat(it, "setSaturation", f.saturation); list += it
+        }
+        if (f.smoothSkin) (com.natan.streambynatan.features.Filters.gpu("BeautyFilterRender") as? BaseFilterRender)?.let { list += it }
+        brightness?.let { list += it }
+        list.forEach { runCatching { gl.addFilter(it) } }
+        runCatching { gl.addFilter(stageFilter) }
+    }
+
+    // ---------------------------------------------------------------- pratinjau layar penuh (seperti TikTok)
+    fun attachPreview(view: android.view.SurfaceView) {
+        if (!this::stream.isInitialized) return
+        runCatching { if (stream.isOnPreview) stream.stopPreview(); stream.startPreview(view) }
+    }
+
+    fun detachPreview() {
+        if (!this::stream.isInitialized) return
+        runCatching { if (stream.isOnPreview) stream.stopPreview() }
+    }
+
+    // ---------------------------------------------------------------- jeda layar
+    /** Menutup layar siaran sementara dengan gambar/tulisan "Sebentar ya", mikrofon ikut dibisukan (opsional). */
+    fun setPaused(on: Boolean) {
+        val p = settings.pause
+        if (on) {
+            val bmp = runCatching { if (p.imagePath.isBlank()) null else context.contentResolver.openInputStream(Uri.parse(p.imagePath))?.use { BitmapFactory.decodeStream(it) } }.getOrNull()
+            stageHost.stage.show("full_pause", if (bmp != null) com.natan.streambynatan.overlay.ImageItem(bmp, "full", "center", p.text)
+                else com.natan.streambynatan.overlay.CardItem(p.text, "Stream By Natan", settings.faqCard, header = "Jeda sebentar"))
+            if (p.muteMic) setMic(false)
+        } else {
+            stageHost.stage.hide("full_pause")
+            if (p.muteMic) setMic(true)
+        }
+        LiveBus.stats { it.copy(paused = on) }
+    }
 
     fun switchFrontBack(front: Boolean? = null) {
         val cam = camera2
@@ -333,6 +439,9 @@ class LiveEngine(private val context: Context, private val owner: LifecycleOwner
         toCamera2()
         LiveBus.stats { it.copy(screenSharing = false) }
     }
+
+    /** Nama kamera yang sedang dipakai. */
+    val currentCamera: String get() = activeCameraName
 
     fun cameraNames(): List<String> = buildList {
         addAll(settings.cameraNames.values)

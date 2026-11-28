@@ -63,7 +63,18 @@ data class LiveStats(
     val network: String = "Baik",
     val screenSharing: Boolean = false,
     val activeCamera: String = "depan",
+    /** Status platform tambahan (Facebook, server lain), id -> status. */
+    val extraStates: Map<String, String> = emptyMap(),
+    val paused: Boolean = false,
+    val battery: Int = -1,
+    val temperatureC: Float = -1f,
 ) {
+    /** Kesehatan siaran: hijau / kuning / merah. */
+    val health: String get() = when {
+        network == "Terputus" || youtubeState.startsWith("Gagal") || tiktokState.startsWith("Gagal") -> "merah"
+        network == "Lemah" || youtubeState.startsWith("Menyambung") || tiktokState.startsWith("Menyambung") -> "kuning"
+        else -> "hijau"
+    }
     val viewers: Int get() = viewersTikTok + viewersYouTube
     val likes: Long get() = likesTikTok + likesYouTube
 }
@@ -82,6 +93,23 @@ object LiveBus {
     val feed: StateFlow<List<String>> = _feed
     fun feed(line: String) = _feed.update { (it + line).takeLast(200) }
     fun clearFeed() { _feed.value = emptyList() }
+
+    /** Catatan untuk layar host (teleprompter / bisikan yang ditampilkan sebagai teks). */
+    private val _hostNote = MutableStateFlow("")
+    val hostNote: StateFlow<String> = _hostNote
+    private var lastNoteAt = 0L
+    fun hostNote(text: String) {
+        val now = System.currentTimeMillis()
+        // judul poin + kalimat pertama tetap terlihat bersama
+        _hostNote.value = if (now - lastNoteAt < 1500 && _hostNote.value.isNotBlank()) (_hostNote.value.lines().last() + "\n" + text) else text
+        lastNoteAt = now
+    }
+
+    /** Pesan dari tamu di ruang tunggu: (nama tamu, isi). */
+    private val _guestMessages = MutableStateFlow<List<Triple<String, String, String>>>(emptyList())
+    val guestMessages: StateFlow<List<Triple<String, String, String>>> = _guestMessages
+    fun guestMessage(peerId: String, name: String, text: String) = _guestMessages.update { (it + Triple(peerId, name, text)).takeLast(100) }
+    fun clearGuestMessages() { _guestMessages.value = emptyList() }
 
     /** Pengumuman untuk pembaca layar (Live Region). */
     private val _announce = MutableSharedFlow<String>(extraBufferCapacity = 32)

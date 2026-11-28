@@ -22,6 +22,8 @@ class PcmMixer(val sampleRate: Int = 44100, val channels: Int = 2) {
     @Volatile private var speech: Voice? = null
     @Volatile var music: MusicStream? = null
     @Volatile var musicGain: Float = 0.25f
+    /** Pengali musik saat host berbicara (1 = normal). Diatur oleh StudioAudioEffect. */
+    @Volatile var duckGain: Float = 1f
     @Volatile var masterGain: Float = 1f
     @Volatile var active: Boolean = false
     var monitor: MonitorPlayer? = null
@@ -66,7 +68,8 @@ class PcmMixer(val sampleRate: Int = 44100, val channels: Int = 2) {
         music?.let { m ->
             val tmp = ShortArray(count)
             val got = m.read(tmp, count)
-            for (i in 0 until got) fx[i] += tmp[i] * musicGain
+            val gMusic = musicGain * duckGain
+            for (i in 0 until got) fx[i] += tmp[i] * gMusic
             if (got > 0) any = true
         }
         if (!any) return

@@ -54,6 +54,9 @@ class GuestClient(private val context: Context) {
         val sharing: Boolean = false,
         val frontCamera: Boolean = true,
         val myName: String = "",
+        val filter: String = "normal",
+        /** Percakapan dengan host: (dari, isi). */
+        val messages: List<Pair<String, String>> = emptyList(),
     )
     enum class Phase { IDLE, WAITING, CONNECTING, ONSTAGE, KICKED, LEFT, ERROR }
 
@@ -145,7 +148,7 @@ class GuestClient(private val context: Context) {
         ref.set(mapOf(
             "name" to shown,
             "mode" to mode, "status" to "waiting", "joinedAt" to System.currentTimeMillis(),
-            "micOn" to (mode == "guest"), "screen" to false, "app" to "android",
+            "micOn" to (mode == "guest"), "screen" to false, "app" to "android", "filter" to _ui.value.filter,
         ))
         set { it.copy(phase = Phase.WAITING, status = if (mode == "camera") "Menyambung ke host…" else "Kamu di ruang tunggu. Tunggu host memasukkanmu.", micOn = mode == "guest") }
         GuestService.start(context, screen = false)
@@ -157,6 +160,15 @@ class GuestClient(private val context: Context) {
             }
         }
         regs += ref.addSnapshotListener { doc, _ -> doc?.let { onMyDoc(it) } }
+        // balasan host / moderator
+        regs += ref.collection("messages").addSnapshotListener { snap, _ ->
+            snap?.documentChanges?.filter { it.type == DocumentChange.Type.ADDED }?.forEach { ch ->
+                val d = ch.document
+                val from = d.getString("from") ?: return@forEach
+                val label = if (from == "guest") "Kamu" else (if (from == "mod") "Moderator " else "Host ") + d.getString("name").orEmpty()
+                set { it.copy(messages = (it.messages + (label to d.getString("text").orEmpty())).takeLast(50)) }
+            }
+        }
     }
 
     private fun onMyDoc(d: DocumentSnapshot) {
@@ -238,6 +250,19 @@ class GuestClient(private val context: Context) {
                 ref.update("offer", mapOf("type" to "offer", "sdp" to sdp.description))
             }
         }, MediaConstraints())
+    }
+
+    /** Kirim pesan ke host dari ruang tunggu (disaring kata kasar oleh host). */
+    fun sendMessage(text: String) {
+        val t = text.trim().take(300)
+        if (t.isBlank()) return
+        peerRef?.collection("messages")?.add(mapOf("from" to "guest", "name" to _ui.value.myName, "text" to t, "at" to System.currentTimeMillis()))
+    }
+
+    /** Filter video tamu (diterapkan host saat menggambar video tamu ke siaran). */
+    fun setFilter(id: String) {
+        peerRef?.update("filter", id)
+        set { it.copy(filter = id, status = "Filter: " + com.natan.streambynatan.features.Filters.byId(id).label) }
     }
 
     fun setMic(on: Boolean, report: Boolean = true) {

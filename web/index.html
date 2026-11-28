@@ -14,10 +14,36 @@
   <section class="card">
     <a class="btn primary" href="/download/">Unduh aplikasi</a>
   </section>
+  <section class="card" id="liveNow" hidden aria-live="polite">
+    <h2>Sedang live sekarang</h2>
+    <div class="list" id="liveList"></div>
+  </section>
   <section class="card small">
     <h2>Diundang jadi tamu?</h2>
     <p>Buka link undangan dari host. Link itu langsung membuka aplikasi, atau bisa masuk lewat browser.</p>
   </section>
+  <p style="text-align:center"><a href="/privasi/" style="color:var(--muted)">Kebijakan privasi</a> · <a href="/hapus-akun/" style="color:var(--muted)">Hapus akun</a></p>
 </main>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<script src="/guest/config.js"></script>
+<script>
+(async function () {
+  try {
+    firebase.initializeApp(window.FIREBASE_CONFIG);
+    const snap = await firebase.firestore().collection('profiles').where('live', '==', true).limit(30).get();
+    const list = document.getElementById('liveList');
+    const fresh = snap.docs.map((d) => d.data()).filter((p) => p.username && (!p.liveStartedAt || Date.now() - p.liveStartedAt < 12 * 3600 * 1000));
+    fresh.forEach((p) => {
+      const a = document.createElement('a'); a.className = 'person'; a.href = '/@' + encodeURIComponent(p.username);
+      if (typeof p.photo === 'string' && p.photo.startsWith('data:image/')) { const img = document.createElement('img'); img.src = p.photo; img.alt = ''; a.appendChild(img); }
+      const t = document.createElement('div'); t.textContent = p.name || '@' + p.username;
+      const sm = document.createElement('span'); sm.textContent = '@' + p.username + ' · sedang live'; t.appendChild(sm); a.appendChild(t);
+      list.appendChild(a);
+    });
+    if (fresh.length) document.getElementById('liveNow').hidden = false;
+  } catch (e) {}
+})();
+</script>
 </body>
 </html>

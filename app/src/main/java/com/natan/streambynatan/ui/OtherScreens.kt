@@ -49,7 +49,7 @@ import java.util.Locale
 
 @Composable
 fun LoginScreen(activity: MainActivity, onDone: () -> Unit) {
-    var email by remember { mutableStateOf("") }
+    var email by remember { mutableStateOf(activity.pendingLoginEmail.value) }
     var pass by remember { mutableStateOf("") }
     var error by remember { mutableStateOf<String?>(null) }
     var busy by remember { mutableStateOf(false) }
@@ -65,6 +65,13 @@ fun LoginScreen(activity: MainActivity, onDone: () -> Unit) {
                 NeonButton("Lanjut tanpa akun") { onDone() }
             }
             return@ScreenColumn
+        }
+        // Beralih akun Google: langsung buka pemilih akun
+        androidx.compose.runtime.LaunchedEffect(Unit) {
+            if (activity.pendingGoogleLogin.value) {
+                activity.pendingGoogleLogin.value = false
+                busy = true; error = Graph.firebase.signInWithGoogle(activity); busy = false; if (error == null) onDone()
+            }
         }
         GlassCard {
             NeonButton(if (busy) "Memproses…" else "Masuk dengan Google", enabled = !busy, icon = Icons.Filled.AccountCircle) {
@@ -99,6 +106,7 @@ fun PermissionScreen(activity: MainActivity, onDone: () -> Unit) {
     val battery = remember(tick) { SystemHelpers.isIgnoringBattery(activity) }
     val dnd = remember(tick) { SystemHelpers.hasDndAccess(activity) }
     val install = remember(tick) { Updater.canInstall(activity) }
+    val media = remember(tick) { activity.mediaPermissionsGranted() }
     androidx.compose.runtime.LaunchedEffect(Unit) { while (true) { kotlinx.coroutines.delay(1500); tick++ } }
     ScreenColumn {
         Spacer(Modifier.height(30.dp))
@@ -110,6 +118,7 @@ fun PermissionScreen(activity: MainActivity, onDone: () -> Unit) {
             PermissionRow("Bebas penghemat baterai (live tidak terputus)", battery) { SystemHelpers.requestIgnoreBattery(activity) }
             PermissionRow("Akses Jangan Ganggu", dnd) { SystemHelpers.requestDnd(activity) }
             PermissionRow("Pasang aplikasi tidak dikenal (pembaruan otomatis)", install) { Updater.openInstallPermission(activity) }
+            PermissionRow("Foto dan video, musik dan audio (latar, overlay, tema, musik dari galeri)", media) { activity.askMediaPermissions() }
         }
         NeonButton(if (basic) "Lanjut" else "Berikan izin dulu", enabled = basic) { onDone() }
         Text("Kamera dan mikrofon wajib. Izin lainnya bisa diberikan nanti di Pengaturan > Sistem.", color = Neon.Muted)

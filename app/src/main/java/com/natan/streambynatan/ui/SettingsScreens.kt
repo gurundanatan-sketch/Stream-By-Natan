@@ -36,15 +36,17 @@ private val pages = listOf(
     Page("keys", "Stream key & server", "YouTube, TikTok, komentar (tanpa API key TikTok)", Icons.Filled.Key),
     Page("video", "Video & koneksi", "Resolusi, bitrate adaptif, sambung ulang, rekam", Icons.Filled.HighQuality),
     Page("features", "Semua fitur", "Nyalakan atau matikan setiap fitur", Icons.Filled.ToggleOn),
-    Page("profiles", "Profil live", "Ngobrol santai, Presentasi, Khotbah, dll", Icons.Filled.Badge),
+    Page("profiles", "Profil live", "Ngobrol santai, Presentasi, Catatan live, Live music, dll", Icons.Filled.Badge),
     Page("tts", "Suara TTS", "Suara, kecepatan, volume (terpisah dari Jieshuo)", Icons.Filled.RecordVoiceOver),
     Page("templates", "Kalimat terima kasih", "Template {nama}, {hadiah}, {jumlah}, {koin}", Icons.Filled.FormatQuote),
     Page("comments", "Komentar & pertanyaan", "Kata tanya, singkatan, filter kata kasar, mute, terjemahan", Icons.Filled.Forum),
     Page("targets", "Target & timer", "Target like/koin/penonton, pengingat waktu", Icons.Filled.Flag),
+    Page("tools", "Alat live", "Giveaway, kuis, request lagu, rundown, pengingat, papan nama, jeda", Icons.Filled.Build),
+    Page("cues", "Getar, suara & TTS per kejadian", "Atur tanda untuk gift, tamu, koneksi putus, dll", Icons.Filled.Vibration),
     Page("screen", "Teks di layar", "Teks overlay, teks berjalan, subtitle, pengumuman", Icons.Filled.Subtitles),
     Page("faq", "Jawaban otomatis (FAQ)", "Pertanyaan yang sering ditanyakan", Icons.Filled.LiveHelp),
     Page("voice", "Perintah suara", "Kalimat pemicu yang bisa diatur", Icons.Filled.KeyboardVoice),
-    Page("notes", "Naskah khotbah & lirik", "Catatan poin, ayat, lirik pujian", Icons.Filled.MenuBook),
+    Page("notes", "Catatan live & lirik", "Catatan poin, ayat, lirik Live music", Icons.Filled.MenuBook),
     Page("visual", "Tampilan & transisi", "Kartu ayat, kode QR, persembahan, Saweria, pembuka/penutup", Icons.Filled.AutoAwesome),
     Page("sound", "Mikrofon, musik & efek suara", "Peredam bising, gema, musik latar, suara gift", Icons.Filled.Equalizer),
     Page("camera", "Kamera & tamu", "Ganti latar, suara saja, nama kamera, tamu lewat link", Icons.Filled.Groups),
@@ -79,6 +81,8 @@ fun SettingsPage(activity: MainActivity, id: String, back: () -> Unit) {
             "templates" -> TemplatesPage(s, up)
             "comments" -> CommentsPage(s, up)
             "targets" -> TargetsPage(s, up)
+            "tools" -> LiveToolsPage(activity, s, up)
+            "cues" -> CuesPage(s, up)
             "screen" -> ScreenTextPage(s, up)
             "faq" -> FaqPage(activity, s, up)
             "voice" -> VoicePage(s, up)
@@ -118,7 +122,20 @@ private fun KeysPage(activity: MainActivity, s: AppSettings, up: Up) {
         Field("Stream key TikTok (berganti setiap live)", ttKey, secret = true) { ttKey = it }
         GhostButton("Tempel key TikTok", icon = Icons.Filled.ContentPaste) { activity.clipboardText()?.let { ttKey = it } }
     }
+    SectionTitle("Platform tambahan")
+    val extraKeys = remember { androidx.compose.runtime.mutableStateMapOf<String, String>().apply { s.extraPlatforms.forEach { put(it.id, Graph.secure.get("key_" + it.id)) } } }
+    s.extraPlatforms.forEach { p ->
+        fun setP(f: (PlatformTarget) -> PlatformTarget) = up { st -> st.copy(extraPlatforms = st.extraPlatforms.map { if (it.id == p.id) f(it) else it }) }
+        GlassCard {
+            SwitchRow("Live ke ${p.name}", p.enabled) { v -> setP { it.copy(enabled = v) } }
+            if (p.id.startsWith("custom")) Field("Nama platform", p.name) { v -> setP { it.copy(name = v) } }
+            Field("Server RTMP/RTMPS", p.server) { v -> setP { it.copy(server = v.trim()) } }
+            Field("Stream key ${p.name}", extraKeys[p.id] ?: "", secret = true) { extraKeys[p.id] = it }
+            GhostButton("Tempel key", icon = Icons.Filled.ContentPaste) { activity.clipboardText()?.let { extraKeys[p.id] = it } }
+        }
+    }
     NeonButton("Simpan", icon = Icons.Filled.Save) {
+        extraKeys.forEach { (id, k) -> Graph.secure.put("key_" + id, k.trim()) }
         Graph.secure.put(SecureStore.YOUTUBE_KEY, ytKey.trim())
         Graph.secure.put(SecureStore.TIKTOK_KEY, ttKey.trim())
         up { it.copy(youtubeServer = ytServer.trim(), tiktokServer = ttServer.trim()) }
@@ -184,7 +201,7 @@ private val featureLabels: List<Triple<String, String, (FeatureToggles) -> Boole
     Triple("verseFromVoice", "Ayat otomatis dari suara", { it.verseFromVoice }),
     Triple("prayerList", "Daftar permohonan doa", { it.prayerList }),
     Triple("backgroundReplace", "Pengganti latar belakang", { it.backgroundReplace }),
-    Triple("lyrics", "Lirik pujian di layar", { it.lyrics }),
+    Triple("lyrics", "Lirik Live music di layar", { it.lyrics }),
     Triple("offering", "Info persembahan", { it.offering }),
     Triple("saweria", "Saweria", { it.saweria }),
     Triple("intro", "Layar pembuka", { it.intro }),
@@ -202,6 +219,22 @@ private val featureLabels: List<Triple<String, String, (FeatureToggles) -> Boole
     Triple("doNotDisturb", "Jangan Ganggu saat live", { it.doNotDisturb }),
     Triple("keepScreenOn", "Layar tetap menyala", { it.keepScreenOn }),
     Triple("progressStats", "Perkembangan antar-live", { it.progressStats }),
+    Triple("giveaway", "Giveaway lewat komentar", { it.giveaway }),
+    Triple("quiz", "Kuis lewat komentar", { it.quiz }),
+    Triple("songRequests", "Request lagu dari penonton", { it.songRequests }),
+    Triple("quietWarning", "Peringatan saat live sepi", { it.quietWarning }),
+    Triple("drinkReminder", "Pengingat minum", { it.drinkReminder }),
+    Triple("batteryWarning", "Peringatan baterai & suhu HP", { it.batteryWarning }),
+    Triple("voiceReply", "Balas komentar YouTube dengan suara", { it.voiceReply }),
+    Triple("pauseButton", "Tombol jeda layar", { it.pauseButton }),
+    Triple("rundown", "Rundown acara", { it.rundown }),
+    Triple("practiceReport", "Laporan latihan Catatan live", { it.practiceReport }),
+    Triple("themes", "TEMA: gambar layar penuh lewat suara", { it.themes }),
+    Triple("nameplate", "Papan nama di layar", { it.nameplate }),
+    Triple("cues", "Getar, suara & TTS per kejadian", { it.cues }),
+    Triple("touchLock", "Kunci sentuh saat live", { it.touchLock }),
+    Triple("musicDucking", "Musik mengecil saat host bicara", { it.musicDucking }),
+    Triple("guestClips", "Potong rekaman per tamu", { it.guestClips }),
 )
 
 /** Mengubah satu saklar berdasarkan nama (lewat JSON supaya ringkas). */
@@ -256,7 +289,7 @@ private fun TtsPage(s: AppSettings, up: Up) {
         SliderRow("Nada", t.pitch, 0.5f..2f) { v -> set { it.copy(pitch = v) } }
         SliderRow("Volume", t.volume, 0.1f..1f) { v -> set { it.copy(volume = v) } }
         SliderRow("Kecepatan bisikan", t.whisperRate, 0.5f..2f) { v -> set { it.copy(whisperRate = v) } }
-        SliderRow("Kecepatan baca naskah khotbah", t.scriptRate, 0.4f..1.2f) { v -> set { it.copy(scriptRate = v) } }
+        SliderRow("Kecepatan baca Catatan live", t.scriptRate, 0.4f..1.2f) { v -> set { it.copy(scriptRate = v) } }
         SwitchRow("Dengarkan TTS & efek suara di earphone", t.monitorPublicTts, "Tidak terdengar dobel oleh penonton") { v -> set { it.copy(monitorPublicTts = v) } }
         GhostButton("Coba suara") { Graph.tts.whisper("Halo, ini suara Stream By Natan.") }
     }
@@ -385,7 +418,7 @@ private fun NotesPage(s: AppSettings, up: Up) {
         }
     }
     GhostButton("Tambah naskah", icon = Icons.Filled.Add) { up { it.copy(notes = it.notes + NoteScript(UUID.randomUUID().toString().take(6), "Naskah baru", "# Poin 1\n")) } }
-    SectionTitle("Lirik pujian")
+    SectionTitle("Lirik Live music")
     s.lyrics.forEach { l ->
         GlassCard {
             Field("Judul lagu", l.title) { v -> up { st -> st.copy(lyrics = st.lyrics.map { if (it.id == l.id) it.copy(title = v) else it }) } }
@@ -653,5 +686,106 @@ private fun SystemPage(activity: MainActivity, s: AppSettings, up: Up) {
         SectionTitle("Kredit musik & efek suara")
         val credits = remember { runCatching { activity.assets.open("credits.txt").bufferedReader().readText() }.getOrDefault("") }
         Text(credits.take(4000), style = MaterialTheme.typography.bodyMedium, color = Neon.Muted)
+    }
+}
+
+
+@Composable
+private fun LiveToolsPage(activity: MainActivity, s: AppSettings, up: Up) {
+    GlassCard {
+        SectionTitle("Giveaway")
+        SwitchRow("Aktifkan giveaway", s.features.giveaway) { v -> up { it.copy(features = it.features.copy(giveaway = v)) } }
+        Field("Kata ikut (penonton menulis ini di komentar)", s.giveaway.keyword) { v -> up { it.copy(giveaway = it.giveaway.copy(keyword = v.trim())) } }
+        NumberField("Lama pendaftaran (detik)", s.giveaway.durationSec) { v -> up { it.copy(giveaway = it.giveaway.copy(durationSec = v)) } }
+        Field("Hadiah", s.giveaway.prize) { v -> up { it.copy(giveaway = it.giveaway.copy(prize = v)) } }
+    }
+    GlassCard {
+        SectionTitle("Kuis")
+        SwitchRow("Aktifkan kuis", s.features.quiz) { v -> up { it.copy(features = it.features.copy(quiz = v)) } }
+        Text("Tulis satu soal per baris: pertanyaan | jawaban", color = Neon.Muted)
+        ListEditor("Soal kuis", s.quiz.map { it.question + " | " + it.answer }) { lines ->
+            up { it.copy(quiz = lines.mapNotNull { l -> val parts = l.split("|"); if (parts.size >= 2 && parts[0].isNotBlank()) QuizItem(parts[0].trim(), parts[1].trim()) else null }) }
+        }
+    }
+    GlassCard {
+        SectionTitle("Request lagu")
+        SwitchRow("Terima request lagu", s.features.songRequests) { v -> up { it.copy(features = it.features.copy(songRequests = v)) } }
+        Field("Kata pemicu request", s.songRequestKeyword) { v -> up { it.copy(songRequestKeyword = v.trim()) } }
+    }
+    GlassCard {
+        SectionTitle("Rundown acara")
+        SwitchRow("Aktifkan rundown", s.features.rundown) { v -> up { it.copy(features = it.features.copy(rundown = v)) } }
+        Text("Satu bagian per baris: judul | menit", color = Neon.Muted)
+        ListEditor("Bagian acara", s.rundown.map { it.title + " | " + it.minutes }) { lines ->
+            up { it.copy(rundown = lines.mapNotNull { l -> val parts = l.split("|"); val t = parts[0].trim(); if (t.isBlank()) null else RundownItem(t, parts.getOrNull(1)?.trim()?.toIntOrNull() ?: 5) }) }
+        }
+    }
+    GlassCard {
+        SectionTitle("Pengingat & peringatan")
+        SwitchRow("Pengingat minum", s.features.drinkReminder) { v -> up { it.copy(features = it.features.copy(drinkReminder = v)) } }
+        NumberField("Ingatkan minum setiap (menit)", s.drinkReminderMinutes) { v -> up { it.copy(drinkReminderMinutes = v) } }
+        SwitchRow("Peringatan live sepi", s.features.quietWarning) { v -> up { it.copy(features = it.features.copy(quietWarning = v)) } }
+        NumberField("Dianggap sepi setelah (menit tanpa komentar)", s.quietWarnMinutes) { v -> up { it.copy(quietWarnMinutes = v) } }
+        SwitchRow("Peringatan baterai & suhu", s.features.batteryWarning) { v -> up { it.copy(features = it.features.copy(batteryWarning = v)) } }
+        NumberField("Peringatan baterai di bawah (%)", s.batteryWarnPercent) { v -> up { it.copy(batteryWarnPercent = v) } }
+        NumberField("Peringatan suhu di atas (°C)", s.temperatureWarnC) { v -> up { it.copy(temperatureWarnC = v) } }
+    }
+    GlassCard {
+        SectionTitle("Balas komentar YouTube dengan suara")
+        SwitchRow("Aktifkan", s.features.voiceReply, "Ucapkan kata pemicu lalu isi balasan, contoh: balas terima kasih semuanya") { v -> up { it.copy(features = it.features.copy(voiceReply = v)) } }
+        Field("Kata pemicu", s.voiceReplyTrigger) { v -> up { it.copy(voiceReplyTrigger = v.trim()) } }
+    }
+    GlassCard {
+        SectionTitle("Papan nama")
+        val n = s.nameplate
+        fun setN(f: (NameplateConfig) -> NameplateConfig) = up { it.copy(nameplate = f(it.nameplate)) }
+        SwitchRow("Tampilkan papan nama", n.enabled) { v -> setN { it.copy(enabled = v) }; up { it.copy(features = it.features.copy(nameplate = v)) } }
+        Field("Nama", n.name) { v -> setN { it.copy(name = v) } }
+        Field("Peran / keterangan", n.role) { v -> setN { it.copy(role = v) } }
+        ChoiceRow("Letak", listOf("bottom_left" to "Kiri bawah", "top_left" to "Kiri atas", "top_right" to "Kanan atas"), n.position) { v -> setN { it.copy(position = v) } }
+        NumberField("Tampil berapa detik di awal (0 = terus)", n.showSeconds) { v -> setN { it.copy(showSeconds = v) } }
+        SwitchRow("Papan nama untuk tamu juga", n.guestPlates) { v -> setN { it.copy(guestPlates = v) } }
+    }
+    GlassCard {
+        SectionTitle("Jeda layar")
+        SwitchRow("Tombol jeda di layar live", s.features.pauseButton) { v -> up { it.copy(features = it.features.copy(pauseButton = v)) } }
+        Field("Tulisan saat jeda", s.pause.text, singleLine = false) { v -> up { it.copy(pause = it.pause.copy(text = v)) } }
+        SwitchRow("Matikan mikrofon saat jeda", s.pause.muteMic) { v -> up { it.copy(pause = it.pause.copy(muteMic = v)) } }
+        GhostButton(if (s.pause.imagePath.isBlank()) "Pilih gambar jeda dari galeri" else "Ganti gambar jeda", icon = Icons.Filled.Image) {
+            activity.pick(arrayOf("image/*")) { u -> up { it.copy(pause = it.pause.copy(imagePath = u.toString())) } }
+        }
+        if (s.pause.imagePath.isNotBlank()) GhostButton("Hapus gambar jeda", icon = Icons.Filled.Delete) { up { it.copy(pause = it.pause.copy(imagePath = "")) } }
+    }
+    GlassCard {
+        SectionTitle("TEMA")
+        SwitchRow("Aktifkan TEMA", s.features.themes, "Saat kamu mengucapkan kata pemicu diikuti judul tema, gambarnya tampil layar penuh") { v -> up { it.copy(features = it.features.copy(themes = v)) } }
+        Field("Kata pemicu", s.themeTrigger) { v -> up { it.copy(themeTrigger = v.trim()) } }
+        NumberField("Lama tampil (detik)", s.themeDurationSec) { v -> up { it.copy(themeDurationSec = v) } }
+        Text("Daftar tema diatur di Sempurnakan, bagian TEMA, saat live.", color = Neon.Muted)
+    }
+    GlassCard {
+        SectionTitle("Lain-lain")
+        SwitchRow("Laporan latihan Catatan live", s.features.practiceReport) { v -> up { it.copy(features = it.features.copy(practiceReport = v)) } }
+        SwitchRow("Kunci sentuh saat live", s.features.touchLock, "Tekan lama untuk membuka kunci") { v -> up { it.copy(features = it.features.copy(touchLock = v)) } }
+        SwitchRow("Potong rekaman per tamu", s.features.guestClips) { v -> up { it.copy(features = it.features.copy(guestClips = v)) } }
+    }
+}
+
+@Composable
+private fun CuesPage(s: AppSettings, up: Up) {
+    GlassCard {
+        SwitchRow("Aktifkan tanda per kejadian", s.features.cues, "Hanya kamu yang merasakan/mendengar, tidak ikut tersiar") { v -> up { it.copy(features = it.features.copy(cues = v)) } }
+    }
+    val sounds = remember { listOf("" to "Tanpa suara") + Graph.sounds.effects.map { it.id to it.label } }
+    Defaults.cueLabels.forEach { (key, label) ->
+        val c = s.cues[key] ?: CueConfig()
+        fun setC(f: (CueConfig) -> CueConfig) = up { it.copy(cues = it.cues + (key to f(it.cues[key] ?: CueConfig()))) }
+        GlassCard {
+            SectionTitle(label)
+            SwitchRow("Getar", c.vibrate) { v -> setC { it.copy(vibrate = v) } }
+            if (c.vibrate) ChoiceRow("Pola getar", listOf("short" to "Pendek", "double" to "Dua kali", "long" to "Panjang", "triple" to "Tiga kali"), c.pattern) { v -> setC { it.copy(pattern = v) } }
+            ChoiceRow("Suara", sounds, c.sound) { v -> setC { it.copy(sound = v) } }
+            SwitchRow("Ucapkan dengan TTS", c.speak) { v -> setC { it.copy(speak = v) } }
+        }
     }
 }

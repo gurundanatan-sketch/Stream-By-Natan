@@ -34,8 +34,23 @@ class SettingsRepository(private val context: Context) {
 
     private fun load(): AppSettings = runBlocking(Dispatchers.IO) {
         val json = runCatching { context.dataStore.data.first()[key] }.getOrNull()
-        json?.let { runCatching { AppJson.decodeFromString(AppSettings.serializer(), it) }.getOrNull() } ?: AppSettings()
+        val loaded = json?.let { runCatching { AppJson.decodeFromString(AppSettings.serializer(), it) }.getOrNull() } ?: AppSettings()
+        migrate(loaded)
     }
+
+    /** Pengaturan lama disesuaikan: judul profil dibuat umum (fitur tetap sama). */
+    private fun migrate(s: AppSettings): AppSettings = s.copy(
+        profiles = s.profiles.map { p ->
+            when {
+                p.id == "khotbah" && p.name == "Khotbah" -> p.copy(name = "Catatan live")
+                p.id == "pujian" && p.name.startsWith("Pujian") -> p.copy(name = "Live music")
+                else -> p
+            }
+        },
+        cues = Defaults.cues + s.cues,
+        extraPlatforms = Defaults.extraPlatforms.map { d -> s.extraPlatforms.firstOrNull { it.id == d.id } ?: d } +
+            s.extraPlatforms.filter { e -> Defaults.extraPlatforms.none { it.id == e.id } },
+    )
 
     fun update(transform: (AppSettings) -> AppSettings) {
         val next = transform(_state.value)

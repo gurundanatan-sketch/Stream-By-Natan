@@ -91,6 +91,12 @@ class LiveBrain(private val context: Context, private val engine: LiveEngine, pr
     private var lyricIndex = 0
     private var startedAt = 0L
 
+    /** Fitur tambahan versi 2 (giveaway, kuis, TEMA, penanda, moderator, dll). */
+    val extras: LiveExtras by lazy { LiveExtras(context, engine, this) }
+
+    /** Diucapkan ke penonton (TTS ikut siaran). */
+    fun publicSay(text: String) = thank(text)
+
     private val speechListener = object : SpeechHub.Listener {
         override fun onPartial(text: String) { main.post { onSpeech(text, final = false) } }
         override fun onFinal(text: String) { main.post { onSpeech(text, final = true) } }
@@ -113,23 +119,42 @@ class LiveBrain(private val context: Context, private val engine: LiveEngine, pr
         scope.launch { LiveBus.events.collect { runCatching { handle(it) } } }
         // TikTok & YouTube
         if (!engine.practice) {
-            if (s.enableTikTok) g.tiktok.connect(s.tiktokUsername)
+            if (s.enableTikTok) {
+                // Pembuat aplikasi: Euler Stream (API key dari Firestore). Pengguna lain: halaman live TikTok.
+                if (g.social.useEuler) g.euler.connect(s.tiktokUsername.removePrefix("@"), g.secure.get(SecureStore.EULER_API_KEY))
+                else g.tiktok.connect(s.tiktokUsername)
+            }
             if (s.enableYouTube) g.ytChat.start(s.youtubeVideoId, g.secure.get(SecureStore.YOUTUBE_API_KEY))
         }
         // pengenal suara
-        val needSpeech = f.subtitles || f.voiceCommands || f.notesWhisper || f.verseFromScript || f.verseFromVoice || f.lyrics || f.transcript
+        val needSpeech = f.subtitles || f.voiceCommands || f.notesWhisper || f.verseFromScript || f.verseFromVoice || f.lyrics || f.transcript || f.themes || f.voiceReply
         if (needSpeech) { g.speech.addListener(speechListener); g.speech.start() }
         loadScript()
         if (f.notesWhisper && script != null) main.postDelayed({ whisperNextSentence() }, if (f.intro) s.intro.durationSec * 1000L + 1500 else 2000)
         scope.launch { timerLoop() }
         scope.launch { announcementLoop() }
         scope.launch { housekeepingLoop() }
+        extras.start()
+        if (!engine.practice) g.social.publishLive(true, liveLinks())
+    }
+
+    /** Tautan live untuk dibagikan (YouTube, TikTok, profil). */
+    fun liveLinks(): Map<String, String> = buildMap {
+        val st = s
+        when {
+            st.youtubeVideoId.isNotBlank() -> put("youtube", "https://youtube.com/watch?v=${st.youtubeVideoId}")
+            st.youtubeChannelUrl.isNotBlank() -> put("youtube", st.youtubeChannelUrl.trimEnd('/') + "/live")
+        }
+        if (st.tiktokUsername.isNotBlank()) put("tiktok", "https://www.tiktok.com/@${st.tiktokUsername.removePrefix("@")}/live")
     }
 
     fun stop() {
+        runCatching { extras.stop() }
+        if (!engine.practice) g.social.publishLive(false, emptyMap())
         g.speech.removeListener(speechListener)
         g.speech.stop()
         g.tiktok.disconnect()
+        runCatching { g.euler.disconnect() }
         g.ytChat.stop()
         g.guests.stop()
         g.tts.stopWhisper()
@@ -173,6 +198,7 @@ class LiveBrain(private val context: Context, private val engine: LiveEngine, pr
                 supporters.merge(e.name, e.totalCoins.toLong(), Long::plus)
                 LiveBus.feed("🎁 ${e.name}: ${e.count}× ${e.giftName} (${e.totalCoins} koin)")
                 sfx(if (e.totalCoins >= s.giftSfx.bigThresholdCoins) s.giftSfx.bigSound else s.giftSfx.smallSound)
+                if (e.totalCoins >= s.giftSfx.bigThresholdCoins) extras.cue("gift_big", "Hadiah besar dari ${e.name}: ${e.giftName}")
                 if (f.thanksGift) thank(TextTools.fill(s.templates.gift, "nama" to e.name, "hadiah" to e.giftName, "jumlah" to e.count, "koin" to e.totalCoins))
                 checkTargets()
             }
@@ -184,6 +210,7 @@ class LiveBrain(private val context: Context, private val engine: LiveEngine, pr
             is LiveEvent.Follow -> {
                 LiveBus.stats { it.copy(follows = it.follows + 1) }
                 LiveBus.feed("➕ ${e.name} follow")
+                if (s.cues["follow"]?.let { it.vibrate || it.speak || it.sound.isNotBlank() } == true) extras.cue("follow", "${e.name} follow")
                 sfx(s.giftSfx.followSound)
                 if (f.thanksFollow) thank(TextTools.fill(s.templates.follow, "nama" to e.name))
             }
@@ -237,6 +264,7 @@ class LiveBrain(private val context: Context, private val engine: LiveEngine, pr
         synchronized(recentCommenters) { recentCommenters.remove(e.name); recentCommenters.add(0, e.name); while (recentCommenters.size > 30) recentCommenters.removeAt(recentCommenters.size - 1) }
         LiveBus.feed("💬 ${e.platform.label} · ${e.name}: $text")
         greet(e.platform, e.userId, e.name, fromComment = true)
+        if (extras.onComment(e)) return
 
         // polling
         poll?.let { p ->
@@ -269,6 +297,7 @@ class LiveBrain(private val context: Context, private val engine: LiveEngine, pr
             questions += Question(e.platform, e.name, readText)
             LiveBus.stats { it.copy(questions = it.questions + 1) }
             LiveBus.announce("Pertanyaan baru dari ${e.name}. ${questions.size} di antrean")
+            if (s.cues["question_new"]?.let { it.vibrate || it.speak || it.sound.isNotBlank() } == true) extras.cue("question_new", "Pertanyaan baru dari ${e.name}")
             return
         }
         // komentar biasa tetap dibacakan
@@ -451,6 +480,7 @@ class LiveBrain(private val context: Context, private val engine: LiveEngine, pr
             val sec = (System.currentTimeMillis() - startedAt) / 1000
             transcript.append(String.format("[%02d:%02d] ", sec / 60, sec % 60)).append(text).append('\n')
         }
+        if (final && extras.onSpeech(text, final)) return
         if (final && f.voiceCommands && handleCommand(text)) return
         if (f.verseFromScript) verseFromScript(text)
         if (f.verseFromVoice && engine.mode != LiveMode.SCREEN) verseFromVoice(text, final)
@@ -490,6 +520,12 @@ class LiveBrain(private val context: Context, private val engine: LiveEngine, pr
                 "poll_result" -> finishPoll()
                 "live_time" -> announceTime()
                 "music_toggle" -> if (g.sounds.musicPlaying) g.sounds.stopMusic() else g.sounds.startMusic(s.music.trackId, s.music.customPath, true)
+                "pause_screen" -> engine.setPaused(true)
+                "resume_screen" -> engine.setPaused(false)
+                "giveaway_draw" -> extras.drawWinner()
+                "quiz_next" -> extras.nextQuiz()
+                "next_song" -> extras.nextSong()
+                "rundown_next" -> extras.nextRundown()
                 else -> continue
             }
             return true
@@ -512,6 +548,7 @@ class LiveBrain(private val context: Context, private val engine: LiveEngine, pr
         val seg = sc.segments[scriptPos]
         if (seg is ParsedScript.Seg.Heading) {
             g.recordings.beginMoment(seg.text, "point")
+            extras.onPoint(seg.text)
             g.tts.whisper("Poin: ${seg.text}", s.tts.scriptRate)
             scriptPos++
             main.postDelayed({ whisperNextSentence() }, 600)
@@ -658,6 +695,7 @@ class LiveBrain(private val context: Context, private val engine: LiveEngine, pr
         while (scope.isActive) {
             delay(5_000)
             applyStageSettings()
+            g.mixer.musicGain = s.music.volume
         }
     }
 

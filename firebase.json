@@ -25,7 +25,13 @@
         ]
       }
     ],
-    "cleanUrls": false
+    "cleanUrls": false,
+    "rewrites": [
+      {
+        "source": "/@**",
+        "destination": "/profile/index.html"
+      }
+    ]
   },
   "firestore": {
     "rules": "firestore.rules"

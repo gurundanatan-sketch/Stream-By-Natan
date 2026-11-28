@@ -104,6 +104,13 @@ class TtsHub(private val context: Context, private val mixer: PcmMixer) {
     /** Hanya kamu yang mendengar. [rate] null = kecepatan bisikan biasa. */
     fun whisper(text: String, rate: Float? = null, onDone: (() -> Unit)? = null) {
         if (text.isBlank()) { onDone?.invoke(); return }
+        // Mode pembaca layar/tunanetra mati: bisikan tampil sebagai teks di layar host (tidak diucapkan).
+        if (!com.natan.streambynatan.core.Graph.settings.current.a11y.voiceAids && !forceVoice) {
+            com.natan.streambynatan.live.LiveBus.hostNote(text)
+            com.natan.streambynatan.live.LiveBus.feed("📝 $text")
+            onDone?.invoke()
+            return
+        }
         if (!privateReady) { synchronized(pendingPrivate) { pendingPrivate.add(Triple(text, rate ?: config.whisperRate, onDone)) }; return }
         val id = "w" + seq.incrementAndGet()
         onDone?.let { callbacks[id] = it }
@@ -111,6 +118,10 @@ class TtsHub(private val context: Context, private val mixer: PcmMixer) {
         val b = Bundle().apply { putFloat(TextToSpeech.Engine.KEY_PARAM_VOLUME, config.volume) }
         priv.speak(text, TextToSpeech.QUEUE_ADD, b, id)
     }
+
+    /** Bisikan yang tetap diucapkan walau mode tunanetra mati (misal peringatan suara yang dipilih pengguna). */
+    @Volatile var forceVoice = false
+    fun speakAlert(text: String) { forceVoice = true; try { whisper(text) } finally { forceVoice = false } }
 
     fun stopWhisper() { priv.stop(); callbacks.clear() }
 

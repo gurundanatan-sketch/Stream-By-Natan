@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Profil · Stream By Natan</title>
+<link rel="stylesheet" href="/style.css">
+</head>
+<body>
+<main>
+  <p class="eyebrow">STREAM BY NATAN</p>
+  <section id="loading" class="card small"><p role="status">Memuat profil…</p></section>
+  <section id="profile" hidden>
+    <div style="display:flex;gap:16px;align-items:center">
+      <img id="photo" class="avatar" alt="Foto profil" hidden>
+      <div>
+        <h1 id="name"></h1>
+        <p id="username" style="margin:0"></p>
+      </div>
+    </div>
+    <p id="bio" style="color:var(--text);white-space:pre-line"></p>
+    <section class="card" id="liveCard" hidden>
+      <p><span class="live-dot">SEDANG LIVE</span></p>
+      <div id="liveLinks" class="list"></div>
+      <a class="btn" id="guestBtn" hidden>Gabung sebagai tamu</a>
+    </section>
+    <section class="card" id="linksCard" hidden><h2>Tautan</h2><div id="links" class="list"></div></section>
+    <section class="card" id="scheduleCard" hidden><h2>Jadwal live</h2><ol id="schedule"></ol></section>
+    <section class="card">
+      <a class="btn primary" id="followBtn">Ikuti di aplikasi (dapat notifikasi saat live)</a>
+      <button class="btn" id="shareBtn" type="button">Bagikan profil</button>
+    </section>
+  </section>
+  <section id="missing" class="card small" hidden>
+    <h2>Profil tidak ditemukan</h2>
+    <p>Periksa lagi ejaan username-nya.</p>
+    <a class="btn" href="/">Ke beranda</a>
+  </section>
+</main>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<script src="/guest/config.js"></script>
+<script>
+(async function () {
+  const $ = (id) => document.getElementById(id);
+  const raw = decodeURIComponent(location.pathname).replace(/^\/@/, '').replace(/^\/profile\/?/, '').replace(/\/.*$/, '');
+  const username = (raw || new URLSearchParams(location.search).get('u') || '').toLowerCase().trim();
+  const safeUrl = (u) => { try { const x = new URL(u); return (x.protocol === 'https:' || x.protocol === 'http:') ? x.href : null; } catch (e) { return null; } };
+  const link = (label, href) => { const a = document.createElement('a'); a.className = 'btn'; a.textContent = label; a.href = href; a.target = '_blank'; a.rel = 'noopener'; return a; };
+  const show = (id) => { $('loading').hidden = true; $(id).hidden = false; };
+  if (!username) return show('missing');
+  try {
+    firebase.initializeApp(window.FIREBASE_CONFIG);
+    const db = firebase.firestore();
+    const u = await db.collection('usernames').doc(username).get();
+    if (!u.exists) return show('missing');
+    const uid = u.data().uid;
+    const doc = await db.collection('profiles').doc(uid).get();
+    if (!doc.exists) return show('missing');
+    const p = doc.data();
+    document.title = (p.name || '@' + username) + ' · Stream By Natan';
+    $('name').textContent = p.name || '@' + username;
+    $('username').textContent = '@' + username;
+    $('bio').textContent = p.bio || '';
+    if (typeof p.photo === 'string' && p.photo.startsWith('data:image/')) { $('photo').src = p.photo; $('photo').hidden = false; }
+    const fresh = p.live && (!p.liveStartedAt || Date.now() - p.liveStartedAt < 12 * 3600 * 1000);
+    if (fresh) {
+      $('liveCard').hidden = false;
+      Object.entries(p.liveLinks || {}).forEach(([k, v]) => { const h = safeUrl(v); if (h) $('liveLinks').appendChild(link('Tonton di ' + (k === 'youtube' ? 'YouTube' : k === 'tiktok' ? 'TikTok' : k), h)); });
+    }
+    if (p.roomOpen && p.room) { $('liveCard').hidden = false; $('guestBtn').hidden = false; $('guestBtn').href = '/join/?room=' + encodeURIComponent(p.room) + '&mode=guest'; }
+    const links = Object.entries(p.links || {}).filter(([, v]) => safeUrl(v));
+    if (links.length) { $('linksCard').hidden = false; links.forEach(([k, v]) => $('links').appendChild(link(k, safeUrl(v)))); }
+    const sched = (p.schedule || []).filter((x) => x && x.at > Date.now()).sort((a, b) => a.at - b.at);
+    if (sched.length) {
+      $('scheduleCard').hidden = false;
+      sched.forEach((x) => { const li = document.createElement('li'); li.textContent = (x.title || 'Live') + ' · ' + new Date(x.at).toLocaleString('id-ID', { dateStyle: 'full', timeStyle: 'short' }); $('schedule').appendChild(li); });
+    }
+    $('followBtn').href = 'streambynatan://profile?u=' + encodeURIComponent(username);
+    $('followBtn').onclick = () => setTimeout(() => { location.href = '/download/'; }, 1800);
+    $('shareBtn').onclick = async () => {
+      const url = location.origin + '/@' + username;
+      if (navigator.share) { try { await navigator.share({ title: $('name').textContent, url }); } catch (e) {} }
+      else { try { await navigator.clipboard.writeText(url); $('shareBtn').textContent = 'Link disalin'; } catch (e) { prompt('Salin link ini:', url); } }
+    };
+    show('profile');
+  } catch (e) { $('loading').innerHTML = '<p role="status">Profil belum bisa dimuat. Coba muat ulang.</p>'; }
+})();
+</script>
+</body>
+</html>

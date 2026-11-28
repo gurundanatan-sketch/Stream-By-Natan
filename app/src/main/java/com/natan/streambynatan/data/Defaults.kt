@@ -78,6 +78,38 @@ object Defaults {
         "poll_result" to listOf("hasil polling", "umumkan hasil polling"),
         "live_time" to listOf("sudah berapa lama", "durasi live"),
         "music_toggle" to listOf("putar musik", "hentikan musik"),
+        "pause_screen" to listOf("jeda layar", "tutup layar sebentar"),
+        "resume_screen" to listOf("buka layar", "lanjutkan layar"),
+        "giveaway_draw" to listOf("undi pemenang", "pilih pemenang"),
+        "quiz_next" to listOf("kuis berikutnya", "pertanyaan kuis"),
+        "next_song" to listOf("lagu berikutnya", "permintaan lagu"),
+        "rundown_next" to listOf("acara berikutnya", "lanjut acara"),
+    )
+
+    /** Platform tambahan. Stream key masing-masing disimpan terenkripsi dengan nama "key_<id>". */
+    val extraPlatforms: List<PlatformTarget> = listOf(
+        PlatformTarget("facebook", "Facebook", "rtmps://live-api-s.facebook.com:443/rtmp/"),
+        PlatformTarget("instagram", "Instagram", "rtmps://edgetee-upload.instagram.com:443/rtmp/"),
+        PlatformTarget("custom1", "Server lain 1", ""),
+        PlatformTarget("custom2", "Server lain 2", ""),
+    )
+
+    /** Penanda (getar / suara / ucapan) per kejadian. */
+    val cues: Map<String, CueConfig> = linkedMapOf(
+        "gift_big" to CueConfig(true, "double", "sfx_success", false),
+        "guest_waiting" to CueConfig(true, "short", "sfx_notif", true),
+        "guest_message" to CueConfig(true, "short", "", true),
+        "connection_lost" to CueConfig(true, "long", "", true),
+        "question_new" to CueConfig(false, "short", "", false),
+        "follow" to CueConfig(false, "short", "", false),
+        "battery_low" to CueConfig(true, "triple", "", true),
+        "moderator" to CueConfig(true, "short", "", true),
+    )
+
+    val cueLabels: Map<String, String> = linkedMapOf(
+        "gift_big" to "Hadiah besar", "guest_waiting" to "Tamu masuk ruang tunggu", "guest_message" to "Pesan dari tamu",
+        "connection_lost" to "Koneksi putus", "question_new" to "Pertanyaan baru", "follow" to "Follow baru",
+        "battery_low" to "Baterai / suhu HP", "moderator" to "Tindakan moderator",
     )
 
     private val allOn = FeatureToggles()
@@ -86,10 +118,10 @@ object Defaults {
         LiveProfile("santai", "Ngobrol santai", allOn.copy(notesWhisper = false, verseFromScript = false, lyrics = false)),
         LiveProfile("presentasi", "Presentasi", allOn.copy(readComments = false, newViewerGreeting = false, subtitles = true)),
         LiveProfile(
-            "khotbah", "Khotbah",
+            "khotbah", "Catatan live",
             allOn.copy(notesWhisper = true, verseFromScript = true, prayerList = true, offering = true,
                 subtitles = true, readComments = false, newViewerGreeting = false, intro = true, outro = true),
         ),
-        LiveProfile("pujian", "Pujian & penyembahan", allOn.copy(lyrics = true, readComments = false, music = false)),
+        LiveProfile("pujian", "Live music", allOn.copy(lyrics = true, readComments = false, music = false)),
     )
 }

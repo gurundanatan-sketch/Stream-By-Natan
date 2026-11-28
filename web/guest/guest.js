@@ -22,6 +22,42 @@
   let peerRef = null, pc = null, camStream = null, screenStream = null, videoSender = null;
   let micOn = true, camOn = true, facing = mode === 'camera' ? 'environment' : 'user';
   let lastHostMute = 0, unsub = [];
+  let filter = 'normal';
+  try { filter = localStorage.getItem('sbn_filter') || 'normal'; } catch (e) {}
+  const FILTERS = [
+    ['normal', 'Normal', 'none'],
+    ['cerah', 'Cerah', 'brightness(1.12) contrast(1.05)'],
+    ['hangat', 'Hangat', 'sepia(0.2) saturate(1.2)'],
+    ['sejuk', 'Sejuk', 'hue-rotate(-10deg) saturate(1.1)'],
+    ['sinematik', 'Sinematik', 'contrast(1.18) saturate(0.85)'],
+    ['vintage', 'Vintage', 'sepia(0.55) contrast(0.92)'],
+    ['hitamputih', 'Hitam putih', 'grayscale(1)'],
+    ['sepia', 'Sepia', 'sepia(1)'],
+    ['cerah_warna', 'Warna cerah', 'saturate(1.45)'],
+    ['pastel', 'Pastel', 'saturate(0.7) contrast(0.88) brightness(1.08)'],
+    ['dramatis', 'Dramatis', 'contrast(1.35) saturate(1.1)'],
+    ['pudar', 'Pudar', 'contrast(0.8) saturate(0.75) brightness(1.06)'],
+    ['senja', 'Senja', 'sepia(0.35) saturate(1.3) hue-rotate(-12deg)'],
+    ['malam', 'Malam', 'brightness(0.85) hue-rotate(15deg)'],
+    ['retro', 'Retro', 'sepia(0.3) contrast(0.95) saturate(1.2)'],
+    ['klasik', 'Klasik', 'sepia(0.4) saturate(1.3)'],
+    ['emas', 'Emas', 'sepia(0.45) saturate(1.5)'],
+    ['negatif', 'Negatif', 'invert(1)'],
+    ['kartun', 'Kartun', 'saturate(1.6) contrast(1.25)'],
+    ['tajam', 'Tajam', 'contrast(1.12)'],
+    ['duotone', 'Duotone', 'grayscale(1) sepia(0.4) hue-rotate(200deg)'],
+  ];
+  FILTERS.forEach(([id, label]) => { const o = document.createElement('option'); o.value = id; o.textContent = label; $('filterSel').appendChild(o); });
+  $('filterSel').value = filter;
+  const applyFilterPreview = () => { const f = FILTERS.find((x) => x[0] === filter); $('preview').style.filter = f ? f[2] : 'none'; };
+  applyFilterPreview();
+  $('filterSel').onchange = () => {
+    filter = $('filterSel').value;
+    try { localStorage.setItem('sbn_filter', filter); } catch (e) {}
+    applyFilterPreview();
+    if (peerRef) peerRef.update({ filter }).catch(() => {});
+    say('Filter ' + $('filterSel').selectedOptions[0].textContent + ' dipakai.');
+  };
 
   async function getCamera() {
     return navigator.mediaDevices.getUserMedia({
@@ -45,11 +81,38 @@
     $('joinCard').hidden = true; $('statusCard').hidden = false; $('mediaCard').hidden = false;
     if (mode === 'camera') { $('micBtn').hidden = true; $('screenBtn').hidden = true; }
     peerRef = peersCol.doc();
-    await peerRef.set({ name, mode, status: 'waiting', joinedAt: Date.now(), micOn: mode === 'guest', screen: false });
+    await peerRef.set({ name, mode, status: 'waiting', joinedAt: Date.now(), micOn: mode === 'guest', screen: false, app: 'web', filter });
+    if (mode === 'guest') { $('chatCard').hidden = false; listenMessages(); }
     say(mode === 'camera' ? 'Menyambung ke host…' : 'Kamu di ruang tunggu. Tunggu host memasukkanmu.');
     watchQueue();
     unsub.push(peerRef.onSnapshot(onMyDoc));
   };
+
+  // Chat ruang tunggu dengan host
+  function addMsg(name, text, me) {
+    const div = document.createElement('div'); div.className = 'msg' + (me ? ' me' : '');
+    const b = document.createElement('b'); b.textContent = me ? 'Kamu' : name; div.appendChild(b);
+    div.appendChild(document.createTextNode(text));
+    $('msgs').appendChild(div); $('msgs').scrollTop = $('msgs').scrollHeight;
+  }
+  function listenMessages() {
+    unsub.push(peerRef.collection('messages').orderBy('at').onSnapshot((snap) => {
+      snap.docChanges().forEach((c) => {
+        if (c.type !== 'added') return;
+        const d = c.doc.data();
+        addMsg(d.name || 'Host', String(d.text || ''), d.from === 'guest');
+        if (d.from !== 'guest') say('Pesan dari ' + (d.name || 'host') + ': ' + d.text);
+      });
+    }));
+  }
+  async function sendMsg() {
+    const t = $('msgInput').value.replace(/[<>\u0000-\u001f]/g, '').trim().slice(0, 300);
+    if (!t || !peerRef) return;
+    $('msgInput').value = '';
+    await peerRef.collection('messages').add({ from: 'guest', name: $('name').value.trim().slice(0, 30), text: t, at: Date.now() }).catch(() => say('Pesan gagal terkirim.'));
+  }
+  $('sendBtn').onclick = sendMsg;
+  $('msgInput').addEventListener('keydown', (e) => { if (e.key === 'Enter') sendMsg(); });
 
   function alertStatus(t) { $('statusCard').hidden = false; say(t); }
 
