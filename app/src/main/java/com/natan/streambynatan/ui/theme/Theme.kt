@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Typography
 import androidx.compose.material3.darkColorScheme
+import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
@@ -74,6 +75,25 @@ object Neon {
         }
     }
 }
+
+/** Skema warna Material dari palet Neon saat ini (gelap atau terang). */
+private fun scheme() = if (Neon.isLight) lightColorScheme(
+    primary = Neon.Cyan, onPrimary = Color.White,
+    secondary = Neon.Violet, onSecondary = Color.White,
+    tertiary = Neon.Pink,
+    background = Neon.Void, onBackground = Neon.Text,
+    surface = Neon.Deep, onSurface = Neon.Text,
+    surfaceVariant = Color(0xFFE6E9F5), onSurfaceVariant = Neon.Muted,
+    outline = Neon.Line, error = Neon.Red,
+) else darkColorScheme(
+    primary = Neon.Cyan, onPrimary = Neon.Void,
+    secondary = Neon.Violet, onSecondary = Color.White,
+    tertiary = Neon.Pink,
+    background = Neon.Void, onBackground = Neon.Text,
+    surface = Neon.Deep, onSurface = Neon.Text,
+    surfaceVariant = if (Neon.Void == Color(0xFF000000)) Color(0xFF111111) else Color(0xFF151C36), onSurfaceVariant = Neon.Muted,
+    outline = Neon.Line, error = Neon.Red,
+)
 
 private val display = FontFamily.SansSerif
 
