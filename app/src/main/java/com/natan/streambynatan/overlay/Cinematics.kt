@@ -138,13 +138,13 @@ class Cinematics(private val template: String) {
         if (subtitle.isNotBlank()) {
             val sAppear = min(1f, max(0f, (t - 1.4f) / 1.2f))
             subPaint.typeface = Typeface.create(Typeface.SANS_SERIF, Typeface.NORMAL)
-            subPaint.textSize = wf * 0.045f
+            subPaint.textSize = minOf(wf, hf) * 0.045f
             subPaint.color = palette.text; subPaint.alpha = (255 * sAppear).toInt()
             val sl = StageView.layout(subtitle, subPaint, (wf * 0.8f).toInt(), Layout.Alignment.ALIGN_CENTER, 3)
             c.save(); c.translate(wf * 0.1f, top + tl.height + hf * 0.05f + (1 - sAppear) * 30f); sl.draw(c); c.restore()
         }
         if (countdown >= 0) {
-            subPaint.textSize = wf * 0.12f
+            subPaint.textSize = minOf(wf, hf) * 0.12f
             subPaint.color = palette.accent; subPaint.alpha = 220
             subPaint.typeface = Typeface.DEFAULT_BOLD
             val s = countdown.toString()

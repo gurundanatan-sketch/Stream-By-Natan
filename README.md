@@ -158,6 +158,11 @@ python scripts/download_assets.py
 - **Sempurnakan**: 21 filter + kecerahan/kontras/saturasi, latar, impor gambar dari galeri ke layar, overlay gambar/video, **TEMA**, teks layar, efek suara, efek mikrofon, pengubah suara (robot, tinggi, chipmunk, berat, raksasa, gema, telepon), musik latar dari galeri dengan volume
 - **Lainnya**: tampilan komentar, kualitas 480/720/1080/otomatis, musik mengecil otomatis saat host bicara (tidak mati), dll
 
+**YouTube & tampilan siaran**
+- Pengaturan siaran YouTube langsung di layar sebelum live: judul, deskripsi, thumbnail, visibilitas, audiens (anak-anak), kategori, tag, bahasa, lokasi, latensi, DVR, jadwal, jeda iklan otomatis (kanal dimonetisasi); bisa dibuat otomatis setiap Mulai live. Jeda iklan manual saat live ada di Lainnya
+- Pilihan tampilan **Tegak 9:16** atau **Mendatar 16:9**; layar HP ikut mendatar selama live
+- TikTok saat mendatar: **Mendatar asli** (seperti TikTok Live Studio) atau **Bingkai tegak** (video 16:9 di tengah, judul di atas, latar buram)
+
 **Fitur tambahan (semua opsional, Pengaturan > Semua fitur / Alat live)**
 - Giveaway lewat kata komentar, kuis, request lagu, rundown acara, laporan latihan Catatan live
 - Peringatan baterai & suhu, pengingat minum, peringatan live sepi (dengan ide topik)

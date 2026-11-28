@@ -67,7 +67,18 @@ data class BroadcastSettings(
     val enableDvr: Boolean = true,
     val thumbnail: ByteArray? = null,
     val thumbnailMime: String = "image/jpeg",
+    val language: String = "id",
+    /** Titik lokasi (null = tanpa lokasi) dan nama tempatnya. */
+    val latitude: Double? = null,
+    val longitude: Double? = null,
+    val locationName: String = "",
+    /** Jeda iklan otomatis (kanal yang sudah dimonetisasi). */
+    val autoAds: Boolean = false,
+    val adIntervalSecs: Int = 900,
 )
+
+/** Hasil membuat siaran: server, stream key, id video, dan catatan bagian yang gagal (tidak menggagalkan siaran). */
+data class BroadcastResult(val server: String, val key: String, val videoId: String, val notes: List<String>)
 
 class YouTubeApi(private val context: Context, private val http: OkHttpClient) {
     private val base = "https://www.googleapis.com/youtube/v3"
@@ -107,7 +118,8 @@ class YouTubeApi(private val context: Context, private val http: OkHttpClient) {
      * jadwal, kategori, tag, latensi. Stream key diambil otomatis.
      * Mengembalikan (url server rtmp, stream key, id video).
      */
-    suspend fun createBroadcast(s: BroadcastSettings): Triple<String, String, String> {
+    suspend fun createBroadcast(s: BroadcastSettings): BroadcastResult {
+        val notes = mutableListOf<String>()
         val start = if (s.scheduledStart > System.currentTimeMillis()) s.scheduledStart else System.currentTimeMillis() + 30_000
         val bc = call("POST", "$base/liveBroadcasts?part=snippet,status,contentDetails", JSONObject().apply {
             put("snippet", JSONObject().put("title", s.title).put("description", s.description).put("scheduledStartTime", iso(start)))
@@ -125,14 +137,34 @@ class YouTubeApi(private val context: Context, private val http: OkHttpClient) {
         })
         val ingestion = st.getJSONObject("cdn").getJSONObject("ingestionInfo")
         call("POST", "$base/liveBroadcasts/bind?id=$broadcastId&part=id,contentDetails&streamId=${st.getString("id")}")
-        // kategori & tag lewat videos.update
+        // kategori, tag, dan bahasa lewat videos.update
         runCatching {
             call("PUT", "$base/videos?part=snippet", JSONObject().put("id", broadcastId).put("snippet", JSONObject()
                 .put("title", s.title).put("description", s.description).put("categoryId", s.categoryId)
-                .put("tags", JSONArray(s.tags))))
-        }
-        s.thumbnail?.let { setThumbnail(broadcastId, it, s.thumbnailMime) }
-        return Triple(ingestion.getString("ingestionAddress"), ingestion.getString("streamName"), broadcastId)
+                .put("tags", JSONArray(s.tags))
+                .put("defaultLanguage", s.language).put("defaultAudioLanguage", s.language)))
+        }.onFailure { notes += "Kategori/tag belum tersimpan" }
+        // lokasi
+        if (s.latitude != null && s.longitude != null) runCatching {
+            call("PUT", "$base/videos?part=recordingDetails", JSONObject().put("id", broadcastId).put("recordingDetails", JSONObject()
+                .put("location", JSONObject().put("latitude", s.latitude).put("longitude", s.longitude))
+                .put("locationDescription", s.locationName)))
+        }.onFailure { notes += "Lokasi ditolak YouTube" }
+        // jeda iklan otomatis (hanya kanal yang dimonetisasi)
+        if (s.autoAds) runCatching {
+            call("PUT", "$base/liveBroadcasts?part=monetizationDetails", JSONObject().put("id", broadcastId).put("monetizationDetails",
+                JSONObject().put("cuepointSchedule", JSONObject()
+                    .put("enabled", true).put("scheduleStrategy", "concurrent")
+                    .put("repeatIntervalSecs", s.adIntervalSecs.coerceAtLeast(300)))))
+        }.onFailure { notes += "Iklan otomatis tidak bisa diatur (kanal belum dimonetisasi?)" }
+        s.thumbnail?.let { t -> runCatching { setThumbnail(broadcastId, t, s.thumbnailMime) }.onFailure { notes += "Thumbnail gagal (kanal perlu verifikasi nomor HP)" } }
+        return BroadcastResult(ingestion.getString("ingestionAddress"), ingestion.getString("streamName"), broadcastId, notes)
+    }
+
+    /** Menyisipkan jeda iklan sekarang (kanal yang dimonetisasi). */
+    suspend fun insertAdBreak(broadcastId: String, durationSecs: Int = 30) {
+        call("POST", "$base/liveBroadcasts/cuepoint?id=$broadcastId", JSONObject()
+            .put("cueType", "cueTypeAd").put("durationSecs", durationSecs))
     }
 
     /** Thumbnail butuh kanal yang sudah verifikasi nomor HP. */

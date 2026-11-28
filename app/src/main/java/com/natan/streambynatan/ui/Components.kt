@@ -223,8 +223,11 @@ fun ChoiceRow(label: String, options: List<Pair<String, String>>, selected: Stri
 /** Editor daftar: satu item per baris. */
 @Composable
 fun ListEditor(label: String, items: List<String>, hint: String = "Satu per baris", onChange: (List<String>) -> Unit) {
-    var text by remember(items) { mutableStateOf(items.joinToString("\n")) }
-    Field("$label ($hint)", text, singleLine = false, minLines = 4) { t -> text = t; onChange(t.lines().map { it.trim() }.filter { it.isNotEmpty() }) }
+    fun parse(t: String) = t.lines().map { it.trim() }.filter { it.isNotEmpty() }
+    var text by remember { mutableStateOf(items.joinToString("\n")) }
+    // ikut berubah kalau daftar diubah dari tempat lain, tapi baris kosong yang sedang diketik tidak hilang
+    if (parse(text) != items) text = items.joinToString("\n")
+    Field("$label ($hint)", text, singleLine = false, minLines = 4) { t -> text = t; onChange(parse(t)) }
 }
 
 /** Editor pasangan "kunci = nilai", satu per baris. */

@@ -70,7 +70,11 @@ class LiveEngine(private val context: Context, private val owner: LifecycleOwner
     var practice = false; private set
     lateinit var brain: LiveBrain; private set
     private val assistant = CameraAssistant { g.tts.whisper(it) }
-    private val compositor = com.natan.streambynatan.guest.StageCompositor()
+    private var compositor = com.natan.streambynatan.guest.StageCompositor()
+    /** Bingkai tegak untuk TikTok saat siaran mendatar (gaya TikTok Live Studio). */
+    private val frame = FrameComposer()
+    /** true = siaran mendatar dikemas dalam bingkai tegak (judul + latar buram). */
+    var frameMode = false; private set
     private var ytIndex = -1
     private var ttIndex = -1
     /** Platform tambahan: id -> indeks klien RTMP. */
@@ -126,11 +130,17 @@ class LiveEngine(private val context: Context, private val owner: LifecycleOwner
     fun prepare(mode: LiveMode, practice: Boolean, proj: MediaProjection?) {
         this.mode = mode; this.practice = practice; this.projection = proj
         val s = settings
+        val landscape = !s.video.portrait
+        frameMode = landscape && s.enableTikTok && s.layout.tiktokLandscape == "frame" && mode == LiveMode.CAMERA
+        compositor = if (landscape) com.natan.streambynatan.guest.StageCompositor(1280, 720) else com.natan.streambynatan.guest.StageCompositor(720, 1280)
+        frame.title = s.layout.frameTitle.ifBlank { s.ytBroadcast.title }
+        frame.showTitle = s.layout.frameShowTitle
+        frame.background = s.layout.frameBackground
         val video = when {
             mode == LiveMode.SCREEN && proj != null -> ScreenSource(context, proj)
             mode == LiveMode.USB -> CameraUvcSource()
             mode == LiveMode.AUDIO_ONLY || s.features.audioOnly -> CanvasVideoSource(loadImage(s.audioOnlyImage) ?: defaultCover()).also { canvasSource = it }
-            s.features.backgroundReplace || s.features.guests -> CanvasVideoSource().also { canvasSource = it }
+            s.features.backgroundReplace || s.features.guests || frameMode -> CanvasVideoSource().also { canvasSource = it }
             else -> Camera2Source(context).also { camera2 = it }
         }
         // Mikrofon + audio internal (Android 10+) kalau ada izin rekam layar, selain itu mikrofon saja.
@@ -148,7 +158,9 @@ class LiveEngine(private val context: Context, private val owner: LifecycleOwner
 
         val v = qualityConfig(s)
         val long = maxOf(v.width, v.height); val short = minOf(v.width, v.height)
-        val rotation = if (v.portrait) 90 else 0
+        // tegak (9:16) atau mendatar (16:9); bingkai tegak TikTok tetap dikirim tegak
+        val encoderPortrait = v.portrait || frameMode
+        val rotation = if (encoderPortrait) 90 else 0
         val okV = stream.prepareVideo(long, short, v.bitrateKbps * 1000, v.fps, 2, rotation)
         val okA = stream.prepareAudio(44100, true, v.audioBitrateKbps * 1000, echoCanceler = false, noiseSuppressor = s.micFx.noiseSuppressor)
         if (!okV || !okA) throw IllegalStateException("HP ini tidak mendukung pengaturan video/audio tersebut. Coba turunkan resolusi.")
@@ -174,7 +186,7 @@ class LiveEngine(private val context: Context, private val owner: LifecycleOwner
         // Lapisan grafis siaran
         stageFilter.setScale(100f, 100f)
         stageFilter.setPosition(0f, 0f)
-        stageHost.layoutParams = ViewGroup.LayoutParams(short, long)
+        stageHost.layoutParams = if (encoderPortrait) ViewGroup.LayoutParams(short, long) else ViewGroup.LayoutParams(long, short)
         stageFilter.setView(stageHost)
         if (s.features.autoLight) {
             brightness = BrightnessFilterRender()
@@ -214,7 +226,7 @@ class LiveEngine(private val context: Context, private val owner: LifecycleOwner
         }
         // Kamera depan sebagai bawaan
         camera2?.let { cam -> main.postDelayed({ if (cam.getCameraFacing() == CameraHelper.Facing.BACK) runCatching { cam.switchCamera() } }, 600) }
-        if (mode == LiveMode.CAMERA && canvasSource != null && (s.features.backgroundReplace || s.features.guests)) {
+        if (mode == LiveMode.CAMERA && canvasSource != null && (s.features.backgroundReplace || s.features.guests || frameMode)) {
             compositor.hostName = g.firebase.displayName ?: "Host"
             bgReplacer = BackgroundReplacer(context, replace = s.features.backgroundReplace) { bmp -> onHostFrame(bmp) }.also { it.start(owner, s.background) }
         }
@@ -480,9 +492,11 @@ class LiveEngine(private val context: Context, private val owner: LifecycleOwner
     }.getOrNull()
 
     private fun defaultCover(): Bitmap {
-        val b = Bitmap.createBitmap(720, 1280, Bitmap.Config.ARGB_8888)
+        // mengikuti tampilan live: tegak 720×1280, mendatar 1280×720
+        val (w, h) = if (settings.video.portrait) 720 to 1280 else 1280 to 720
+        val b = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
         val c = android.graphics.Canvas(b)
-        CinematicItem("malam", "Sedang siaran suara", "Stream By Natan", 1, false).draw(c, 720, 1280, 4000)
+        CinematicItem("malam", "Sedang siaran suara", "Stream By Natan", 1, false).draw(c, w, h, 4000)
         return b
     }
 
@@ -492,11 +506,14 @@ class LiveEngine(private val context: Context, private val owner: LifecycleOwner
     private fun onHostFrame(bmp: Bitmap) {
         val src = canvasSource ?: return
         val onStage = g.guests.stage.value
-        if (settings.features.guests && onStage.any { it.status == "onstage" }) src.submit(compositor.render(bmp, onStage))
-        else src.submit(bmp)
+        val scene = if (settings.features.guests && onStage.any { it.status == "onstage" }) compositor.render(bmp, onStage) else bmp
+        src.submit(if (frameMode) frame.compose(scene) else scene)
     }
 
     @Volatile private var levelForUi: ((Float) -> Unit)? = null
+    /** Mengubah judul bingkai tegak TikTok saat live. */
+    fun setFrameTitle(title: String, show: Boolean) { frame.title = title; frame.showTitle = show }
+
     fun micLevelListener(l: ((Float) -> Unit)?) { levelForUi = l }
     fun overlayBackgroundColor(): Int = Color.TRANSPARENT
 }

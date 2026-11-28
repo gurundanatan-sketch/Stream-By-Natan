@@ -138,6 +138,32 @@ private fun GoLivePanel(activity: MainActivity, openAccount: (String) -> Unit) {
         val count = (if (settings.enableYouTube) 1 else 0) + (if (settings.enableTikTok) 1 else 0) + settings.extraPlatforms.count { it.enabled }
         if (count >= 3) Text("$count platform sekaligus butuh internet unggah sekitar ${count * 3} Mbps. Coba Periksa sebelum live.", color = Neon.Amber)
 
+        // tampilan siaran: tegak atau mendatar
+        SectionTitle("Tampilan siaran")
+        LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            item { FilterChipButton("Tegak 9:16", settings.video.portrait) { Graph.settings.update { it.copy(video = it.video.copy(portrait = true)) } } }
+            item { FilterChipButton("Mendatar 16:9", !settings.video.portrait) { Graph.settings.update { it.copy(video = it.video.copy(portrait = false)) } } }
+        }
+        if (!settings.video.portrait) {
+            Text("Putar HP ke posisi mendatar saat live. Cocok untuk YouTube.", color = Neon.Muted)
+            if (settings.enableTikTok) GlassCard {
+                Text("Tampilan di TikTok", style = MaterialTheme.typography.titleMedium)
+                ChoiceRow("", listOf("native" to "Mendatar asli (seperti TikTok Live Studio)", "frame" to "Bingkai tegak (judul + latar buram)"), settings.layout.tiktokLandscape) { v ->
+                    Graph.settings.update { it.copy(layout = it.layout.copy(tiktokLandscape = v)) }
+                }
+                if (settings.layout.tiktokLandscape == "native") {
+                    Text("Penonton TikTok melihat video mendatar di tengah layar dan bisa memutar HP-nya untuk menonton layar penuh, sama seperti siaran dari TikTok Live Studio di laptop.", color = Neon.Muted)
+                } else {
+                    Text("Satu siaran dipakai untuk semua platform, jadi YouTube juga akan menerima bingkai tegak. Pilih ini kalau live ke TikTok saja, atau kalau tidak masalah YouTube ikut tegak. Hanya untuk sumber Kamera HP.", color = Neon.Amber)
+                    Field("Judul di atas video (kosong = judul YouTube)", settings.layout.frameTitle) { v -> Graph.settings.update { it.copy(layout = it.layout.copy(frameTitle = v.take(80))) } }
+                    SwitchRow("Tampilkan judul", settings.layout.frameShowTitle) { v -> Graph.settings.update { it.copy(layout = it.layout.copy(frameShowTitle = v)) } }
+                    ChoiceRow("Latar", listOf("blur" to "Video diburamkan", "dark" to "Gelap bergradasi"), settings.layout.frameBackground) { v ->
+                        Graph.settings.update { it.copy(layout = it.layout.copy(frameBackground = v)) }
+                    }
+                }
+            }
+        }
+
         // 3) sumber video & profil: masing-masing satu baris
         SectionTitle(str["source"] ?: "Sumber video")
         LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -154,7 +180,22 @@ private fun GoLivePanel(activity: MainActivity, openAccount: (String) -> Unit) {
         val pulse by rememberInfiniteTransition(label = "p").animateFloat(1f, 1.04f, infiniteRepeatable(tween(1100), RepeatMode.Reverse), label = "s")
         NeonButton(if (practice) (str["start_practice"] ?: "MULAI LATIHAN") else (str["start_live"] ?: "MULAI LIVE"),
             Modifier.scale(pulse).heightIn(min = 64.dp), brush = if (practice) Neon.brandH else Neon.live, icon = Icons.Filled.PlayArrow) {
-            activity.startLive(mode, practice, internalAudio || mode == LiveMode.SCREEN)
+            val landscape = !settings.video.portrait
+            // putar layar dulu supaya kamera menyesuaikan posisi mendatar
+            if (landscape) activity.requestedOrientation = android.content.pm.ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
+            val yt = settings.ytBroadcast
+            val makeYt = yt.autoCreate && settings.enableYouTube && !practice && activity.youtubeConnected.value && yt.title.isNotBlank()
+            scope.launch {
+                if (makeYt) {
+                    activity.message.value = "Membuat siaran YouTube…"
+                    createYouTubeBroadcast(activity, yt)?.let { activity.message.value = "$it Live tetap dimulai dengan stream key terakhir." }
+                }
+                if (landscape) delay(700)
+                activity.startLive(mode, practice, internalAudio || mode == LiveMode.SCREEN)
+                // kalau live batal dimulai (izin ditolak), kembalikan layar tegak
+                delay(20_000)
+                if (!LiveBus.stats.value.isLive) activity.requestedOrientation = android.content.pm.ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
+            }
         }
 
         // 5) opsi lainnya (dilipat)
@@ -177,6 +218,10 @@ private fun GoLivePanel(activity: MainActivity, openAccount: (String) -> Unit) {
                     }
                 }
                 GhostButton("Siaran YouTube", Modifier.weight(1f), Icons.Filled.SmartDisplay) { showYt = true }
+            }
+            if (settings.enableYouTube) {
+                GhostButton("Cek monetisasi di YouTube Studio", icon = Icons.Filled.MonetizationOn) { openMonetizationCheck(activity) }
+                Text("Pastikan monetisasi siaran menyala sebelum live (Edit > Monetisasi > Aktif). Hanya untuk kanal yang sudah dimonetisasi.", color = Neon.Muted)
             }
             GhostButton("Tempel key TikTok dari clipboard", icon = Icons.Filled.ContentPaste) {
                 val t = activity.clipboardText()
@@ -210,6 +255,13 @@ private fun LiveDashboard(activity: MainActivity, openAccount: (String) -> Unit,
     var locked by remember { mutableStateOf(false) }
     var now by remember { mutableStateOf(System.currentTimeMillis()) }
     LaunchedEffect(Unit) { while (true) { delay(1000); now = System.currentTimeMillis() } }
+    // siaran mendatar: layar ikut mendatar selama live, kembali tegak setelah selesai
+    val landscapeLive = remember { !Graph.settings.current.video.portrait }
+    DisposableEffect(landscapeLive) {
+        activity.requestedOrientation = if (landscapeLive) android.content.pm.ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
+            else android.content.pm.ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
+        onDispose { activity.requestedOrientation = android.content.pm.ActivityInfo.SCREEN_ORIENTATION_PORTRAIT }
+    }
 
     Box(Modifier.fillMaxSize().background(Color.Black)) {
         // pratinjau siaran penuh layar
@@ -627,6 +679,30 @@ private fun MoreSheet(activity: MainActivity, openAccount: (String) -> Unit, ope
     SwitchRow("Subtitle otomatis", s.features.subtitles) { v -> feat { it.copy(subtitles = v) } }
     SwitchRow("Perintah suara", s.features.voiceCommands) { v -> feat { it.copy(voiceCommands = v) } }
     SwitchRow("Papan nama", s.features.nameplate, "Nama dan keterangan tampil di siaran") { v -> feat { it.copy(nameplate = v) } }
+
+    if (s.enableYouTube) {
+        SectionTitle("YouTube")
+        GhostButton("Cek monetisasi di YouTube Studio", icon = Icons.Filled.MonetizationOn) { openMonetizationCheck(activity) }
+    }
+    if (s.enableYouTube && s.youtubeVideoId.isNotBlank()) {
+        val scope = rememberCoroutineScope()
+        GhostButton("Jeda iklan sekarang (kanal dimonetisasi)", icon = Icons.Filled.SmartDisplay) {
+            scope.launch {
+                runCatching { Graph.ytApi.insertAdBreak(Graph.settings.current.youtubeVideoId, 30) }
+                    .onSuccess { activity.message.value = "Jeda iklan 30 detik dikirim ke YouTube." }
+                    .onFailure { activity.message.value = "Jeda iklan gagal: ${it.message?.take(120)}" }
+            }
+        }
+    }
+    if (engine?.frameMode == true) {
+        SectionTitle("Bingkai TikTok")
+        var t by remember { mutableStateOf(s.layout.frameTitle.ifBlank { s.ytBroadcast.title }) }
+        Field("Judul di atas video", t) { t = it.take(80) }
+        GhostButton("Pakai judul ini") {
+            Graph.settings.update { it.copy(layout = it.layout.copy(frameTitle = t)) }
+            engine.setFrameTitle(t, Graph.settings.current.layout.frameShowTitle)
+        }
+    }
 
     SectionTitle("Musik latar")
     SwitchRow("Musik mengecil saat host bicara", s.features.musicDucking, "Musik tidak hilang, hanya mengecil, lalu kembali normal") { v -> feat { it.copy(musicDucking = v) }; engine?.updateMicFx() }

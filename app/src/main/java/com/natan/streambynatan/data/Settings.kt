@@ -70,6 +70,10 @@ data class AppSettings(
     val extraPlatforms: List<PlatformTarget> = Defaults.extraPlatforms,
     /** Kualitas video: 480 | 720 | 1080 | auto */
     val quality: String = "720",
+    /** Pengaturan siaran YouTube terakhir (diisi otomatis saat membuat siaran berikutnya). */
+    val ytBroadcast: YtBroadcastPrefs = YtBroadcastPrefs(),
+    /** Tampilan siaran mendatar untuk TikTok. */
+    val layout: LayoutConfig = LayoutConfig(),
     val filter: FilterConfig = FilterConfig(),
     val screenText: ScreenTextConfig = ScreenTextConfig(),
     val nameplate: NameplateConfig = NameplateConfig(),
@@ -103,6 +107,41 @@ data class DisplayConfig(
     val theme: String = "dark", // dark | light
     val largeText: Boolean = false,
     val highContrast: Boolean = false,
+)
+
+@Serializable
+data class YtBroadcastPrefs(
+    val title: String = "",
+    val description: String = "",
+    /** public | unlisted | private */
+    val privacy: String = "public",
+    val madeForKids: Boolean = false,
+    val categoryId: String = "22",
+    val tags: List<String> = emptyList(),
+    /** normal | low | ultraLow */
+    val latency: String = "low",
+    val enableDvr: Boolean = true,
+    /** Bahasa judul & audio (kode ISO, misal id, en). */
+    val language: String = "id",
+    /** Nama tempat (dicari otomatis jadi titik lokasi). */
+    val location: String = "",
+    val thumbnailUri: String = "",
+    /** Buat siaran baru otomatis dengan pengaturan ini setiap tombol Mulai live ditekan. */
+    val autoCreate: Boolean = false,
+    /** Jeda iklan otomatis selama live (hanya untuk kanal yang sudah dimonetisasi). */
+    val autoAds: Boolean = false,
+    val adIntervalMinutes: Int = 15,
+)
+
+@Serializable
+data class LayoutConfig(
+    /** Kalau siaran mendatar dan TikTok menyala: native = 16:9 asli (seperti TikTok Live Studio), frame = bingkai tegak. */
+    val tiktokLandscape: String = "native",
+    /** Judul di bagian atas bingkai tegak. */
+    val frameTitle: String = "",
+    val frameShowTitle: Boolean = true,
+    /** blur = latar video diburamkan, dark = latar gelap bergradasi */
+    val frameBackground: String = "blur",
 )
 
 @Serializable

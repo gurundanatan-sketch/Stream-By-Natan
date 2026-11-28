@@ -59,7 +59,8 @@ class StageCompositor(private val width: Int = 720, private val height: Int = 12
             drawTile(c, focus, RectF(0f, 0f, width.toFloat(), height.toFloat()), fill = !focus.screen, showLabel = people.size > 1)
         } else {
             val n = people.size
-            val cols = if (n <= 2) 1 else 2
+            // tegak: bertumpuk ke bawah; mendatar: berdampingan
+            val cols = if (width > height) (if (n <= 1) 1 else if (n <= 4) 2 else 3) else (if (n <= 2) 1 else 2)
             val rows = ceil(n / cols.toFloat()).toInt()
             val tw = width / cols.toFloat(); val th = height / rows.toFloat()
             people.forEachIndexed { i, p ->

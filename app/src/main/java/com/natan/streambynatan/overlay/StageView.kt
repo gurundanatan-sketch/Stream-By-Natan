@@ -115,7 +115,7 @@ class StageView(context: Context) : View(context) {
 
     private fun drawOverlayText(c: Canvas, w: Int, h: Int) {
         val text = overlayText.takeIf { it.isNotBlank() } ?: return
-        overlayPaint.textSize = w * 0.042f
+        overlayPaint.textSize = minOf(w, h) * 0.042f
         val layout = layout(text, overlayPaint, (w * 0.86f).toInt(), Layout.Alignment.ALIGN_CENTER)
         val top = h * 0.05f
         boxPaint.color = 0x99000000.toInt()
@@ -132,7 +132,7 @@ class StageView(context: Context) : View(context) {
         val st = screenText ?: return
         if (!st.enabled || st.text.isBlank()) return
         overlayPaint.color = st.color
-        overlayPaint.textSize = w * 0.05f * st.size.coerceIn(0.5f, 2.5f)
+        overlayPaint.textSize = minOf(w, h) * 0.05f * st.size.coerceIn(0.5f, 2.5f)
         val layout = layout(st.text, overlayPaint, (w * 0.86f).toInt(), Layout.Alignment.ALIGN_CENTER, 4)
         val top = when (st.position) { "center" -> (h - layout.height) / 2f; "bottom" -> h * 0.62f; else -> h * 0.13f }
         if (st.background) {
@@ -148,7 +148,7 @@ class StageView(context: Context) : View(context) {
         if (streamComments.isEmpty()) return
         val now = System.currentTimeMillis()
         streamComments.removeIf { now - it.third > 12_000 }
-        commentName.textSize = w * 0.03f; commentText.textSize = w * 0.032f
+        commentName.textSize = minOf(w, h) * 0.03f; commentText.textSize = minOf(w, h) * 0.032f
         var y = h * 0.58f
         for ((name, text, _) in streamComments) {
             val l = layout(text, commentText, (w * 0.58f).toInt(), Layout.Alignment.ALIGN_NORMAL, 2)
@@ -165,7 +165,7 @@ class StageView(context: Context) : View(context) {
     private fun drawNameplate(c: Canvas, w: Int, h: Int) {
         val (name, role) = nameplate ?: return
         if (name.isBlank()) return
-        plateName.textSize = w * 0.048f; plateRole.textSize = w * 0.032f
+        plateName.textSize = minOf(w, h) * 0.048f; plateRole.textSize = minOf(w, h) * 0.032f
         val tw = maxOf(plateName.measureText(name), plateRole.measureText(role)) + w * 0.08f
         val bh = plateName.textSize * 1.3f + (if (role.isNotBlank()) plateRole.textSize * 1.4f else 0f) + 20
         val tickerReserve = if (tickerText.isNotBlank()) w * 0.04f * 1.8f + 10 else 0f
@@ -187,7 +187,7 @@ class StageView(context: Context) : View(context) {
     /** Teks berjalan, diletakkan sedikit DI ATAS subtitle supaya tidak bertumpuk. */
     private fun drawTicker(c: Canvas, w: Int, h: Int) {
         val text = tickerText.takeIf { it.isNotBlank() } ?: return
-        tickerPaint.textSize = w * 0.04f
+        tickerPaint.textSize = minOf(w, h) * 0.04f
         val barH = tickerPaint.textSize * 1.8f
         val subReserve = if (subtitle.isNotBlank()) h * 0.13f else h * 0.02f
         val bottom = h - subReserve
@@ -203,7 +203,7 @@ class StageView(context: Context) : View(context) {
     /** Subtitle otomatis di bagian PALING BAWAH video. */
     private fun drawSubtitle(c: Canvas, w: Int, h: Int) {
         val text = subtitle.takeIf { it.isNotBlank() } ?: return
-        subPaint.textSize = w * 0.045f * subtitleScale
+        subPaint.textSize = minOf(w, h) * 0.045f * subtitleScale
         val layout = layout(text.takeLast(140), subPaint, (w * 0.9f).toInt(), Layout.Alignment.ALIGN_CENTER, maxLines = 2)
         val bottom = h - h * 0.015f
         val top = bottom - layout.height - 16
@@ -224,7 +224,7 @@ class StageView(context: Context) : View(context) {
             boxPaint.color = 0xFF22E5FF.toInt()
             c.drawRoundRect(RectF(r.left - 4, r.top - 4, r.right + 4, r.bottom + 4), 20f, 20f, boxPaint)
             c.drawBitmap(bmp, null, r, null)
-            tickerPaint.textSize = w * 0.03f
+            tickerPaint.textSize = minOf(w, h) * 0.03f
             boxPaint.color = 0xAA000000.toInt()
             c.drawRect(r.left, r.bottom - tickerPaint.textSize * 1.5f, r.right, r.bottom, boxPaint)
             c.drawText(name, r.left + 10, r.bottom - tickerPaint.textSize * 0.4f, tickerPaint)
